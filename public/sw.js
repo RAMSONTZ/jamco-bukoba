@@ -1,4 +1,4 @@
-const CACHE='jamco-social-20261122-v1';
+const CACHE='jamco-social-20261122-v2';
 const assets=['/social.css','/social.js','/brand/icon-192.png','/manifest.webmanifest'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(assets)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('jamco')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));

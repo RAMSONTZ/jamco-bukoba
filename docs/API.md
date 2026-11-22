@@ -7,6 +7,7 @@ All social operations use `POST /api/social/{action}` and JSON. Public reads use
 | Action | Input | Result |
 |---|---|---|
 | feed | offset, optional kind/category/q/slug | 12 published posts, counts, member flags, more |
+| stories | none | active publisher stories, expires after 24 hours |
 | comments | slug | up to 200 comments, chronological, parent IDs |
 | discover | none | published place/event/photo records |
 | me | none | current user, saves, email configuration state |
@@ -30,7 +31,7 @@ All social operations use `POST /api/social/{action}` and JSON. Public reads use
 | submit | verified member; title,body,category,location,media,consent; enters moderation |
 | premium | verified member; one pending request per member |
 | upload | verified member or authenticated staff; signature-checked JPG/PNG/WebP up to 1 MiB, MP4/WebM up to 3 MiB |
-| view | verified member; distinct viewer/post/day |
+| view | verified member; distinct viewer/post/day; client reports after at least 2 seconds of actual playback |
 
 ## Staff
 

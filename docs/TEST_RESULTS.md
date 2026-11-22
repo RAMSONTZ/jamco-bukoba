@@ -10,7 +10,7 @@ Email delivery is disabled during isolated tests. Verification uses a test token
 
 ## Browser
 
-Local feed rendered with the approved logo and existing licensed photos. Full-screen viewer opens and closes without retaining zoom. Further mobile and deployed checks are recorded in the release report.
+Local feed rendered with the approved logo and existing licensed photos. Full-screen viewer opens and closes without retaining zoom. The preview deployment dpl_J5GMYXgyL7QMV2zJS2N5xyKBd3gK reached READY and loaded its database feed in the browser. Guest saves persisted after navigation. Responsive iframe checks at 320/375/390/430/768/1366 px found scrollWidth equal to clientWidth (no horizontal overflow); the 15 px browser scrollbar reduced layout width in each case. All five mobile destinations were visible. A 390 px screenshot was captured. Production verification is recorded in RELEASE.md.
 
 ## Explicit limitations
 
