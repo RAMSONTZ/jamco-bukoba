@@ -11,7 +11,7 @@ if (process.argv.includes('--migrate')) {
   process.exit(0);
 }
 if (process.env.JAMCO_LOCAL_DB) await migrate();
-const types = {'.js':'text/javascript','.css':'text/css','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.webp':'image/webp','.webmanifest':'application/manifest+json'};
+const types = {'.js':'text/javascript','.css':'text/css','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.webp':'image/webp','.avif':'image/avif','.webmanifest':'application/manifest+json'};
 const root = resolve('public');
 http.createServer(async (req,res) => {
   if(req.url==='/__qa'&&!process.env.VERCEL){res.setHeader('Content-Type','text/html');return res.end(await readFile(new URL('./qa/responsive.html',import.meta.url)));}

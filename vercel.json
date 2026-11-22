@@ -2,10 +2,39 @@
   "framework": null,
   "installCommand": "npm ci",
   "outputDirectory": "public",
-  "functions":{"api/site.js":{"maxDuration":60}},
-  "routes":[
-    {"src":"/sw.js","headers":{"Cache-Control":"no-cache"},"continue":true},
-    {"handle":"filesystem"},
-    {"src":"/(.*)","dest":"/api/site?__path=/$1"}
+  "functions": {
+    "api/site.js": {
+      "maxDuration": 60
+    }
+  },
+  "routes": [
+    {
+      "src": "/sw.js",
+      "headers": {
+        "Cache-Control": "no-cache"
+      },
+      "continue": true
+    },
+    {
+      "src": "/photos/optimized/(.*)",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      },
+      "continue": true
+    },
+    {
+      "src": "/brand/jamco-logo-display.webp",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      },
+      "continue": true
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/site?__path=/$1"
+    }
   ]
 }

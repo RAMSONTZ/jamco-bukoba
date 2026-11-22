@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile,stat} from 'node:fs/promises';
+import {optimizeMedia,transformImage} from '../lib/media.js';
+import {instagramPermalink,allowedInstagramMedia,importInstagram} from '../lib/instagram-import.js';
+test('responsive assets are smaller and originals remain available',async()=>{const m=optimizeMedia({type:'image',url:'/photos/aircraft-1100.webp'});assert.match(m.avifSrcset,/480w/);assert.ok((await stat('public'+m.thumbnail)).size<1500);assert.ok((await stat('public'+m.large)).size>10000);assert.ok((await stat('public/brand/jamco-logo-display.webp')).size<23000)});
+test('uploaded image variants decode and reject unbounded sizes',async()=>{const data=await readFile('public/brand/icon-48.png');const f=await transformImage({mime:'image/png',data},320,'webp');assert.equal(f.mime,'image/webp');assert.equal(f.data.subarray(8,12).toString(),'WEBP');await assert.rejects(transformImage({mime:'image/png',data},9999,'webp'),e=>e.status===400)});
+test('Instagram import requires authorization and rejects untrusted media hosts',async()=>{assert.equal(instagramPermalink('https://www.instagram.com/jamcobukoba2013/p/Ab12/'),'https://www.instagram.com/p/Ab12/');assert.throws(()=>instagramPermalink('https://evil.example/p/Ab12/'));for(const u of ['http://s.cdninstagram.com/a','https://cdninstagram.com.evil.example/a','https://127.0.0.1/a','https://u:p@s.fbcdn.net/a'])assert.equal(allowedInstagramMedia(u),false);assert.equal(allowedInstagramMedia('https://s.cdninstagram.com/a'),true);await assert.rejects(importInstagram({},'test',{confirmed:true}),e=>e.status===503)});

@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS jamco_instagram_comments (id text PRIMARY KEY,slug text NOT NULL REFERENCES jamco_content(slug) ON DELETE CASCADE,author text NOT NULL,body text NOT NULL,posted_at timestamptz NOT NULL,source_url text NOT NULL,hidden boolean NOT NULL DEFAULT false,imported_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS jamco_instagram_comments_post ON jamco_instagram_comments(slug,posted_at);

@@ -1,3 +1,5 @@
+import {transformImage} from '../lib/media.js';
+import {publicFeed,clearPublicFeed} from '../lib/public-feed.js';
 import {social,member} from '../lib/social.js';
 import {socialShell} from '../lib/social-pages.js';
 import { getDb, published } from '../lib/db.js';
@@ -59,6 +61,14 @@ export default async function handler(req,res) {
   const path = (parsed.pathname==='/api/site' && typeof req.query?.__path==='string' ? req.query.__path : parsed.pathname).replace(/\/$/,'') || '/';
   const query=parsed.searchParams;
   try {
+    if(path==='/api/feed'){
+      if(!['GET','HEAD'].includes(req.method))return json(res,405,{message:'Method not allowed'});
+      const data=Object.fromEntries(query);delete data.__path;
+      const result=await publicFeed(await getDb(),req,res,data);
+      res.setHeader('Cache-Control','public, max-age=0, s-maxage=10, stale-while-revalidate=20');
+      res.setHeader('Vary','Accept-Encoding');
+      return send(res,200,'application/json; charset=utf-8',JSON.stringify(result));
+    }
     if(path.startsWith('/api/')) {
       const method=path==='/api/push-config'?'GET':'POST';
       if(req.method!==method) return json(res,405,{message:'Njia hii haikubaliki.'});
@@ -68,6 +78,7 @@ export default async function handler(req,res) {
       const data=method==='POST'?await input(req):{};
       const manage=path.startsWith('/api/manage/');
       const result=path.startsWith('/api/social/')?await social(db,req,res,path.slice(12),data):manage?await adminAction(db,req,res,path.slice(12),data):await publicAction(db,req,res,path.slice(5),data);
+      if(manage||/\/(?:admin-publish|admin-moderate|admin-instagram-import|admin-instagram-hide|like|comment|comment-edit|comment-delete|comment-like)$/.test(path))clearPublicFeed();
       return json(res,200,result);
     }
     if(!['GET','HEAD'].includes(req.method)) return send(res,405,'text/plain','Method not allowed');
@@ -80,6 +91,7 @@ export default async function handler(req,res) {
       res.setHeader('Cache-Control','no-store');
       res.setHeader('X-JAMCO-Release','social-20261122');
       let initial={};
+      if(path==='/'){initial.feed=await publicFeed(await getDb(),req,res,{limit:8});res.setHeader('Cache-Control','public, max-age=0, s-maxage=10, stale-while-revalidate=20');}
       if(path.startsWith('/habari/')){const slug=path.slice(8);const rows=(await (await getDb()).query("SELECT data,kind,live_at FROM jamco_content WHERE slug=$1 AND state='published' AND live_at<=now() AND (NOT(data ? 'expiresAt') OR (data->>'expiresAt')::timestamptz>now())",[slug])).rows;if(!rows[0])return send(res,404,'text/html; charset=utf-8',socialShell(path));initial={post:{title:rows[0].data.title,body:rows[0].data.body||rows[0].data.summary,date:rows[0].data.date,publisher:rows[0].data.publisher,slug}};}
       return send(res,200,'text/html; charset=utf-8',socialShell(path,initial));
     }
@@ -87,7 +99,8 @@ export default async function handler(req,res) {
       const db=await getDb();let file=await media(db,req,path.slice(7));
       if(!file && /^[a-f0-9-]{36}$/.test(path.slice(7))){const u=await member(db,req),staff=await session(db,req);if(u||staff){const row=(await db.query('SELECT mime,data,public,owner FROM jamco_uploads WHERE id=$1',[path.slice(7)])).rows[0];if(row&&(row.owner===u?.id||row.owner===staff?.email||['owner','editor'].includes(staff?.role)||(staff&&(await db.query('SELECT 1 FROM jamco_staff WHERE email=$1 AND permissions @> \'["moderate"]\'::jsonb',[staff.email])).rows.length)))file=row;}}
       if(!file) return send(res,404,'text/plain','File not found');
-      res.setHeader('Cache-Control',file.public?'public, max-age=86400':'no-store, private');
+      if(query.has('w'))file=await transformImage(file,Number(query.get('w')),query.get('format')||'webp');
+      res.setHeader('Cache-Control',file.public?'public, max-age=31536000, s-maxage=31536000, immutable':'no-store, private');
       return send(res,200,file.mime,file.data);
     }
     const [items,popular]=await Promise.all([published(),

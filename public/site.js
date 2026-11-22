@@ -71,13 +71,7 @@
     }
   }
   const theme=document.querySelector('[data-theme-select]');
-  const oldTheme=(()=>{try{return localStorage.getItem('jamco4-theme');}catch{return null;}})();
-  const existing=get('theme',oldTheme||'dark');
-  document.documentElement.dataset.theme=existing;
-  if(theme) {
-    theme.value=existing;
-    theme.addEventListener('change',()=>{document.documentElement.dataset.theme=theme.value;put('theme',theme.value);});
-  }
+  if(theme){theme.value=window.JamcoTheme?.get()||'dark';theme.addEventListener('change',()=>window.JamcoTheme?.set(theme.value));}
   syncSaved();syncFollowed();
 
   const dialog=document.querySelector('.lightbox');
