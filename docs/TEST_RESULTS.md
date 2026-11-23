@@ -2,7 +2,7 @@
 
 ## Automated
 
-`npm test` passes 24 test groups against isolated in-memory PostgreSQL-compatible PGlite storage, without touching production accounts or posts.
+`npm test` passes 27 test groups against isolated in-memory PostgreSQL-compatible PGlite storage, without touching production accounts or posts.
 
 Covered: legacy public/editorial routes, SEO metadata and sitemap; owner bootstrap; mandatory TOTP; staff restrictions; genuine registration/session/verification-token workflow; private versus published media; image signature rejection; duplicate-like prevention under concurrent requests; author-only comment edits/deletion; threaded replies and notifications; comment likes; save synchronization across two sessions; restricted moderator grants; reports and hiding; submission review and publisher approval; premium approval/expiry/revocation; scheduling and expiration; warning verification; Origin/Fetch Metadata rejection; MFA replay rejection; suspension/session invalidation; audit records; legacy campaign tracking, Instagram review inputs and push subscription validation.
 
@@ -23,3 +23,7 @@ No claim of penetration-test certification, physical-device cross-device testing
 ## Gundua photographic categories
 
 The 23 November release adds twelve 160/320/480 px transparent WebP category assets and shared server/client discovery markup. New checks verify preserved alpha, small thumbnail bytes, all category routes in initial HTML, safe search escaping, relevant category aliases, removal of reporter metadata, and exclusion of future/expired discovery records. All 24 test groups pass in isolated storage.
+
+## Feed, member media and playback follow-up
+
+All 27 tests pass. Added workflows cover member-owned private image preview (including transformed thumbnails), denial to guests and other members, profile photo synchronization, contributor names/avatars in moderated posts, explicit sponsored-content labels, real topic predicates, text-only posts, video media inside story records, byte-range serving and invalid-range rejection. QA media fixtures have a synthetic test pattern and generated tone, only appear in Vercel Preview, never enter the database, and are rejected in Production. Live browser playback checks are reported separately; automated tests do not prove physical-device audio quality.
