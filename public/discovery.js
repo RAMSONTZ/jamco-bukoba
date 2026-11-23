@@ -6,24 +6,44 @@ export const discoveryCategories=[
  {key:'utalii',label:'Utalii',description:'Mandhari na maeneo ya kutembelea',aliases:['Utalii','Ziwa Victoria','Kumbukumbu','Bukoba Leo']},
  {key:'hoteli',label:'Hoteli',description:'Malazi na sehemu za kupumzika',aliases:['Hoteli','Malazi']},
  {key:'migahawa',label:'Migahawa',description:'Chakula na ladha za karibu',aliases:['Migahawa','Chakula']},
- {key:'usafiri',label:'Usafiri',description:'Boda boda, barabara na safari',aliases:['Usafiri','Miundombinu']},
+ {key:'usafiri',label:'Usafiri',description:'Chagua aina ya usafiri',aliases:['Usafiri','Boda boda','Teksi','Taxi','Meli']},
+ {key:'maendeleo',label:'Maendeleo',description:'Miradi, ujenzi na fursa',aliases:['Maendeleo','Miundombinu','Ujenzi'],art:'usafiri'},
+ {key:'maduka',label:'Maduka',description:'Bidhaa na maduka ya Bukoba',aliases:['Maduka'],art:'biashara'},
  {key:'afya',label:'Afya',description:'Huduma na taarifa za afya',aliases:['Afya','Hospitali','Maduka ya dawa','Bima ya afya']},
  {key:'biashara',label:'Biashara',description:'Wajasiriamali na biashara za karibu',aliases:['Biashara','Business Promotions']},
  {key:'burudani',label:'Burudani',description:'Muziki, sanaa na burudani',aliases:['Burudani','Sanaa','Muziki']},
  {key:'elimu',label:'Elimu',description:'Shule, masomo na maarifa',aliases:['Elimu','Shule']},
  {key:'michezo',label:'Michezo',description:'Viwanja, timu na michezo',aliases:['Michezo','Sports','Mpira']},
  {key:'huduma',label:'Huduma za jamii',description:'Wataalamu na huduma muhimu',aliases:['Huduma za jamii','Huduma']}
-].map(c=>({...c,...assets[c.key]}));
-export function categoryFor(label){return discoveryCategories.find(c=>c.label===label||c.key===label)}
+].map(c=>({...c,...assets[c.art||c.key]}));
+export const transportCategories=[
+ {key:'boda-boda',label:'Boda boda',description:'Piga simu kwa mwendesha boda boda kwa safari au kupeleka bidhaa.',aliases:['Boda boda','Pikipiki'],parent:'usafiri'},
+ {key:'teksi',label:'Teksi',description:'Piga simu kwa dereva wa teksi katika eneo lako.',aliases:['Teksi','Taxi'],parent:'usafiri'},
+ {key:'meli',label:'Meli',description:'Tiketi na huduma za meli katika Ziwa Victoria.',aliases:['Meli','Ziwa Victoria'],parent:'usafiri'},
+];
+const allCategories=[...discoveryCategories,...transportCategories];
+export function categoryFor(label){return allCategories.find(c=>c.label===label||c.key===label)}
 export function categoryImage(c,eager=false){const variants=c.variants;return `<img class="category-cutout" src="${variants[0].url}" srcset="${variants.map(v=>`${v.url} ${v.width}w`).join(', ')}" sizes="(max-width: 480px) 29vw, 140px" width="320" height="320" alt="" ${eager?'loading="eager"':'loading="lazy"'} decoding="async">`}
+const route=label=>'/gundua?category='+encodeURIComponent(label);
 export function discoveryPage(category='',q=''){
- const selected=categoryFor(category);return `<section class="discovery-page" aria-labelledby="discovery-title"><header class="discovery-intro">${selected? `<a class="discovery-reset" href="/gundua" data-ui="Rudi Gundua">Rudi Gundua</a><h1 id="discovery-title" data-ui="${esc(selected.label)}">${esc(selected.label)}</h1><p data-ui="${esc(selected.description)}">${esc(selected.description)}</p>`:'<h1 id="discovery-title" data-ui="Gundua">Gundua</h1>'}</header><form action="/gundua" class="discovery-search" role="search"><label class="sr-only" for="discovery-query" data-ui="Tafuta Bukoba">Tafuta Bukoba</label><input id="discovery-query" name="q" value="${esc(q)}" maxlength="100" placeholder="Tafuta taarifa, eneo au huduma…" data-ui-placeholder="Tafuta taarifa, eneo au huduma…" type="search">${category?`<input type="hidden" name="category" value="${esc(category)}">`:''}<button type="submit" aria-label="Tafuta" data-ui-label="Tafuta"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></button></form>${selected?'':`<nav class="discovery-categories" aria-label="Makundi ya Gundua" data-ui-label="Makundi ya Gundua">${discoveryCategories.map((c,i)=>`<a class="discovery-category${selected?.key===c.key?' selected':''}" href="/gundua?category=${encodeURIComponent(c.label)}"${selected?.key===c.key?' aria-current="page"':''} aria-label="${esc(c.label)}" data-ui-label="${esc(c.label)}"><div class="category-art">${categoryImage(c,i<6)}</div><span data-ui="${esc(c.label)}">${esc(c.label)}</span></a>`).join('')}</nav>`}<div id="discovery-gallery"></div><section class="discovery-section" aria-labelledby="results-title"><div class="discovery-section-head"><div><h2 id="results-title" data-ui="${q?'Matokeo ya utafutaji':selected?'Taarifa na huduma':'Habari na maeneo'}">${esc(q?'Matokeo ya utafutaji':selected?'Taarifa na huduma':'Habari na maeneo')}</h2></div>${category||q?'<a class="discovery-reset" href="/gundua"><span data-ui="Tazama yote">Tazama yote</span> <span aria-hidden="true">↗</span></a>':''}</div><p id="discovery-count" class="discovery-count" role="status"></p><div id="discover-results" class="discovery-results" aria-live="polite"><div class="discovery-loading" role="status">Inatafuta taarifa…</div></div></section></section>`;
+ const selected=categoryFor(category),root=!category&&!q,transport=selected?.key==='usafiri'&&!q;
+ const heading=selected?.label||(q?'Matokeo ya utafutaji':'Gundua');
+ const back=selected?.parent?route('Usafiri'):'/gundua';
+ const parent=selected?.parent?'Rudi Usafiri':'Rudi Gundua';
+ const title=`<header class="discovery-intro">${root?'':`<a class="discovery-reset" href="${back}" data-ui="${parent}">${parent}</a>`}<h1 id="discovery-title" data-ui="${esc(heading)}">${esc(heading)}</h1>${selected?.description?`<p data-ui="${esc(selected.description)}">${esc(selected.description)}</p>`:''}</header>`;
+ const search=`<form action="/gundua" class="discovery-search" role="search"><label class="sr-only" for="discovery-query" data-ui="Tafuta Bukoba">Tafuta Bukoba</label><input id="discovery-query" name="q" value="${esc(q)}" maxlength="100" placeholder="Tafuta taarifa, eneo au huduma…" data-ui-placeholder="Tafuta taarifa, eneo au huduma…" type="search">${category?`<input type="hidden" name="category" value="${esc(category)}">`:''}<button type="submit" aria-label="Tafuta" data-ui-label="Tafuta"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></button></form>`;
+ const grid=root?`<nav class="discovery-categories" aria-label="Makundi ya Gundua" data-ui-label="Makundi ya Gundua">${discoveryCategories.map((c,i)=>`<a class="discovery-category" href="${route(c.label)}" aria-label="${esc(c.label)}" data-ui-label="${esc(c.label)}"><div class="category-art">${categoryImage(c,i<6)}</div><span data-ui="${esc(c.label)}">${esc(c.label)}</span></a>`).join('')}</nav>`:'';
+ const transportNav=transport?`<nav class="transport-choices" aria-label="Aina za usafiri">${transportCategories.map(c=>`<a href="${route(c.label)}"><span class="transport-mark" aria-hidden="true">${{'boda-boda':'↗',teksi:'↗',meli:'↗'}[c.key]}</span><strong data-ui="${esc(c.label)}">${esc(c.label)}</strong><small data-ui="${esc(c.description)}">${esc(c.description)}</small></a>`).join('')}</nav>`:'';
+ const results=root||transport?'':`<div id="discovery-gallery"></div><section class="discovery-section" aria-labelledby="results-title"><h2 id="results-title" data-ui="Taarifa na huduma">Taarifa na huduma</h2><p id="discovery-count" class="discovery-count" role="status"></p><div id="discover-results" class="discovery-results" aria-live="polite"><div class="discovery-loading" role="status">Inatafuta taarifa…</div></div></section>`;
+ return `<section class="discovery-page" aria-labelledby="discovery-title">${title}${search}${grid}${transportNav}${results}</section>`;
 }
 export function matchesDiscovery(item,category='',q=''){
  const d=item.data||{},selected=categoryFor(category),labels=[d.category,d.discoveryCategory,d.contentType,...(Array.isArray(d.categories)?d.categories:[])];
  const kindMatch=selected?.key==='habari'?['story','video'].includes(item.kind)&&d.contentType!=='Wasifu wa huduma':
   selected?.key==='matukio'?Boolean(d.eventDate)||item.kind==='event':
-  selected?.key==='utalii'?item.kind==='photo':false;
+  selected?.key==='utalii'?item.kind==='photo':
+  selected?.key==='meli'?d.publisher==='Tanzania Shipping Company (TASHICO)':
+  selected?.key==='maendeleo'?['bukoba-yakagua-miradi','ukaguzi-nshambya-ihungo','soko-jipya-bukoba','miradi-ya-mji-wa-bukoba','mv-mwanza-yazinduliwa'].includes(item.slug):false;
  const categoryMatch=!category||kindMatch||(selected?labels.some(l=>selected.aliases.includes(l)):labels.includes(category));
  const haystack=[d.title,d.body,d.summary,d.location,d.category,d.discoveryCategory].filter(Boolean).join(' ').toLocaleLowerCase('sw');return categoryMatch&&(!q||haystack.includes(q.trim().toLocaleLowerCase('sw')));
 }

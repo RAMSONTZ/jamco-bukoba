@@ -88,7 +88,7 @@ export default async function handler(req,res) {
   const parsed = new URL(req.url,'http://internal');
   const path = (parsed.pathname==='/api/site' && typeof req.query?.__path==='string' ? req.query.__path : parsed.pathname).replace(/\/$/,'') || '/';
   const query=parsed.searchParams;
-  if(path==='/admin')res.setHeader('Permissions-Policy','camera=(), microphone=(self), geolocation=()');
+  if(['/admin','/admin/mmiliki'].includes(path))res.setHeader('Permissions-Policy','camera=(), microphone=(self), geolocation=()');
   try {
     if(path.startsWith('/__qa/')){if(process.env.VERCEL_ENV!=='preview'||path!=='/__qa/media.mp4')return send(res,404,'text/plain','Not found');res.setHeader('Cache-Control','no-store');return sendBinary(req,res,{mime:'video/mp4',data:await readFile(new URL('../qa/video-audio-test.mp4',import.meta.url))})}
     if(path==='/api/today'){
@@ -123,9 +123,9 @@ export default async function handler(req,res) {
       return send(res,308,'text/plain','Moved');
     }
     if(path==='/robots.txt') return send(res,200,'text/plain; charset=utf-8','User-agent: *\nDisallow: /admin\nDisallow: /api/\nSitemap: '+origin+'/sitemap.xml\n');
-    if(['/','/admin','/gundua','/shiriki','/orodha/ombi','/akaunti','/hifadhi','/arifa'].includes(path)||/^\/habari\/[a-z0-9-]+$/.test(path)) {
+    if(['/','/admin','/admin/mmiliki','/admin/wakala','/gundua','/shiriki','/orodha/ombi','/akaunti','/hifadhi','/arifa'].includes(path)||/^\/habari\/[a-z0-9-]+$/.test(path)) {
       res.setHeader('Cache-Control','no-store');
-      res.setHeader('X-JAMCO-Release','bukoba-20261123-1');
+      res.setHeader('X-JAMCO-Release','bukoba-20261123-3');
       let initial=path==='/gundua'?{category:(query.get('category')||'').slice(0,80),q:(query.get('q')||'').slice(0,100)}:{};
       if(path==='/'){initial.topic=feedTopics.some(t=>t.key===query.get('mada'))?query.get('mada'):'bukoba';initial.qa=process.env.VERCEL_ENV==='preview'&&query.get('qa')==='media';if(initial.qa)initial.feed=mediaFixture();else{
         const db=await getDb();

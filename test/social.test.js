@@ -159,3 +159,58 @@ test('service provider requests are private and only editorial staff can review 
  assert.equal((await api('admin-intake-status',{reference:request.reference,status:'reviewing'},owner)).status,200);
  assert.equal((await api('admin-intake',{},owner)).data.items.find(item=>item.reference===request.reference).status,'reviewing');
 });
+
+test('owner issues a single-use agent invitation and the agent can securely submit a driver listing',async()=>{
+ const password='Only for this test suite and nowhere else',email='field-agent@example.test';
+ for(const path of ['/admin/mmiliki','/admin/wakala'])assert.equal((await fetch(host+path)).status,200);
+ assert.equal((await api('admin-agent-invite',{email},alice)).status,401);
+ assert.equal((await api('admin-agent-invite',{email},moderator)).status,403);
+ const invite=await api('admin-agent-invite',{email},owner);
+ assert.equal(invite.status,200,JSON.stringify(invite.data));
+ assert.match(invite.data.token,/^[a-f0-9]{64}$/);
+ const other=await api('agent-accept',{email:'wrong@example.test',password,token:invite.data.token});
+ assert.equal(other.status,409);
+ assert.equal((await api('agent-accept',{email,password,token:invite.data.token})).status,200);
+ assert.equal((await api('agent-accept',{email,password,token:invite.data.token})).status,409);
+ assert.equal((await api('staff-login',{email,password,mode:'owner'})).status,403);
+ const signed=await api('staff-login',{email,password,mode:'agent'});
+ assert.equal(signed.status,200);
+ const session=signed.cookie;
+ assert.equal((await api('agent-profile',{},session)).status,401);
+ await enroll(session);
+ assert.equal((await api('staff-me',{},session)).data.agent,true);
+ assert.equal((await api('admin-publish',content,session)).status,403);
+ assert.equal((await api('admin-intake',{},session)).status,403);
+ assert.equal((await api('admin-agents',{},session)).status,403);
+ assert.equal((await api('agent-profile',{},owner)).status,403);
+ const png=await readFile(new URL('../public/brand/icon-48.png',import.meta.url));
+ const upload={id:randomUUID(),mime:'image',size:png.length};
+ assert.equal((await api('agent-upload-part',{...upload,part:0,data:png.toString('base64')},session)).status,200);
+ const photo=(await api('agent-upload-part',{...upload,finish:true},session)).data;
+ assert.equal(photo.type,'image');
+ assert.equal((await fetch(host+photo.url)).status,404);
+ assert.equal((await api('agent-profile-save',{name:'Wakala wa jaribio',photoId:photo.id},session)).status,200);
+ const request=await api('agent-submit',{name:'Dereva wa jaribio',location:'Bukoba',service:'Boda boda',message:'Kusafirisha watu na kupeleka chakula katika eneo la jaribio.',phone:'+255700111222',consent:true,publicContact:true,delivery:true,photoId:photo.id},session);
+ assert.equal(request.status,200,JSON.stringify(request.data));
+ const listing={...content,slug:'driver-listing-test',contentType:'Wasifu wa huduma',category:'Boda boda',intakeReference:request.data.reference,phone:'+255700111222',delivery:true,title:'Dereva wa jaribio',media:[photo]};
+ assert.equal((await api('admin-publish',{...listing,media:[]},owner)).status,400);
+ assert.equal((await api('admin-publish',listing,owner)).status,200);
+ assert.equal((await api('admin-publish',{...listing,phone:''},owner)).status,400);
+ assert.equal((await api('feed',{slug:listing.slug})).data.posts[0].kind,'listing');
+ assert.equal((await api('feed',{q:'Dereva wa jaribio'})).data.posts.length,0);
+ assert.ok((await api('discover',{q:'Dereva wa jaribio'})).data.items.some(item=>item.slug===listing.slug));
+ assert.equal((await api('agent-profile',{},session)).data.listings[0].slug,listing.slug);
+ assert.equal((await fetch(host+photo.url)).status,200);
+ assert.equal((await api('admin-agent-update',{email,active:false},owner)).status,200);
+ assert.equal((await api('agent-profile',{},session)).status,401);
+});
+
+test('an optional featured announcement is included on its specified day and ordinary posts stay in the feed',async()=>{
+ const day=bukobaDate(),notice={...content,contentType:'Tangazo',slug:'highlight-day-test',title:'Tangazo muhimu la jaribio',highlightDay:day};
+ assert.equal((await api('admin-publish',notice,owner)).status,200);
+ assert.equal((await api('admin-publish',{...notice,slug:'ordinary-today-test',highlightDay:''},owner)).status,200);
+ const schedule=await (await fetch(host+'/api/today')).json();
+ assert.equal(schedule.items.find(item=>item.slug===notice.slug).featured,true);
+ assert.ok(!schedule.items.some(item=>item.slug==='ordinary-today-test'));
+ assert.equal((await api('admin-publish',{...notice,highlightDay:'2026-02-30'},owner)).status,400);
+});

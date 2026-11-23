@@ -1,6 +1,11 @@
 (() => {
   const strings = {
     'Nyumbani':'Home','Gundua':'Explore','Akaunti':'Account','Arifa':'Notifications','Tafuta':'Search','Shiriki nasi':'Contact JAMCO',
+    'Boda boda':'Motorcycle taxis','Teksi':'Taxis','Meli':'Ferries','Maduka':'Shops','Rudi Usafiri':'Back to transport','Tangazo muhimu la leo':'Today’s important notice',
+    'Chagua aina ya usafiri':'Choose how to travel','Miradi, ujenzi na fursa':'Projects, construction and opportunities','Bidhaa na maduka ya Bukoba':'Products and shops in Bukoba',
+    'Piga simu kwa mwendesha boda boda kwa safari au kupeleka bidhaa.':'Call a rider for a trip or a delivery.',
+    'Piga simu kwa dereva wa teksi katika eneo lako.':'Call a taxi driver in your area.',
+    'Tiketi na huduma za meli katika Ziwa Victoria.':'Ferry tickets and Lake Victoria services.',
     'Habari':'News','Matukio':'Events','Utalii':'Tourism','Hoteli':'Hotels','Migahawa':'Restaurants','Usafiri':'Transport',
     'Afya':'Health','Biashara':'Business','Burudani':'Entertainment','Elimu':'Education','Michezo':'Sports','Huduma za jamii':'Community services',
     'Serikali':'Government','Maendeleo':'Development','Jamii':'Community','Matangazo':'Notices','Bukoba':'Bukoba',
