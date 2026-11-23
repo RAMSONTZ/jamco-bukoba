@@ -56,3 +56,11 @@ All social operations use `POST /api/social/{action}` and JSON. Public reads use
 The public feed polls at 20 seconds when visible; comments refresh at 12 seconds without replacing text being typed. Reloading from a second client queries the same database. This is polling, not a WebSocket system. Uploaded content persists in the existing `jamco_uploads` PostgreSQL bytea store. Private uploads are only served to their owner or an authorized editorial reviewer. New publish operations make attached media public. Large-video CDN/transcoding remains an external integration.
 
 Notifications for immediate new posts, replies, submission decisions and membership decisions persist per member with preferences. Existing web-push supports opt-in and explicit editorial delivery via `/api/manage/push`. Provider acceptance counts are not claims of device delivery. Automatic push for every event and scheduled-post notification dispatch are not implemented.
+
+## Topic feed and member media (23 November 2026)
+
+GET /api/feed supports topic=bukoba|serikali|maendeleo|jamii|matukio|matangazo|michezo and media=image|video|text, together with offset/limit and existing kind filters. It returns public content only; personal interaction state is private. See FEED_WORKFLOWS.md for reader and publisher behavior.
+
+GET/HEAD /media/:id supports one HTTP byte range. Authorization runs before media transformations and range selection: private member uploads are visible only to the uploading active member and authorized staff. Saving an owned profile avatar makes that avatar public. Approved member submissions include contributorId and obtain the current contributor display name/avatar from public profile fields, never email or credentials. Explicit Tangazo la biashara submissions receive the sponsored-content label only after authorized publication.
+
+The QA fixture query and /__qa/media.mp4 are Preview-only; production ignores the fixture query and rejects the media route. No QA content is inserted into the database.

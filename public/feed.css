@@ -2,3 +2,4 @@
 @media(max-width:760px){.topic-rail{gap:15px}.feed-compose{padding:14px 20px}.feed-tools{padding-inline:20px}.post-note .post-copy h2{font-size:19px}.post-note .caption{font-size:15px}.topic-rail .story-bubble>span:last-child{font-size:10px}}@media(max-width:350px){.feed-compose,.feed-tools{padding-inline:16px}.video-controls{gap:5px}.video-volume{width:52px}}
 #viewer:has(.viewer-stage video) .viewer-tools{display:none}
 .topic-rail .story-bubble>span:not(.topic-circle){max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.media-slide img{height:auto}

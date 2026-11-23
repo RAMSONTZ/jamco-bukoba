@@ -37,3 +37,7 @@ Rollback: the preceding Gundua production deployment is dpl_qrYpNHBnbS1FWmpK8jGM
 ## Browser QA observed
 
 In the Preview fixture, the MP4 decoded with readyState=4 and no media error; muted playback, pause, unmute, a 0.95 slider value, full-screen playback and a single playing video were observed. The inline video paused while the carousel was viewed. Optional carousel rotation advanced from 1/2 to 2/2. Image zoom reached scale 1.5; previous/next selected the other image and closing cleared the viewer. Opt-in auto-scroll at eight seconds moved to the next post; the Stop control turned it off, and a reload left it off. No application console errors were reported in that check. The generated tone is a playback test, not a claim about loudspeakers or every physical device.
+
+## Release gate
+
+The new feed is verified in Preview but not yet at the production hostname: Vercel rejected new deployment creation with its daily free-deployment limit (HTTP 402, api-deployments-free-per-day). The current production release remains the completed photographic Gundua release. Latest code and documentation are on GitHub main; the next build must target production with production database configuration. There is no Git integration link on the Vercel project at this check. Later CSS polish hides image zoom controls during video playback and fixes intrinsic image-height sizing; those two styling changes are awaiting an allowed build and browser recheck.
