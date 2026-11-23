@@ -4,7 +4,8 @@
   "outputDirectory": "public",
   "functions": {
     "api/site.js": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "node_modules/@spelling-creator/spellophone/{espeak-ng-data,wasm}/**"
     }
   },
   "routes": [
