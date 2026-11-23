@@ -33,3 +33,7 @@ Preview-only /?qa=media provides three conspicuously labeled QA fixtures (a gene
 The 27 automated tests use isolated storage and cover server-side authorization, private media ownership, moderation, topic/media filtering, profile persistence, text notes and byte ranges, alongside earlier social workflows. Production data is preserved; this release needs no database migration.
 
 Rollback: the preceding Gundua production deployment is dpl_qrYpNHBnbS1FWmpK8jGMtY8Rq8rv. Preserve the database and new user data when rolling back frontend/runtime code.
+
+## Browser QA observed
+
+In the Preview fixture, the MP4 decoded with readyState=4 and no media error; muted playback, pause, unmute, a 0.95 slider value, full-screen playback and a single playing video were observed. The inline video paused while the carousel was viewed. Optional carousel rotation advanced from 1/2 to 2/2. Image zoom reached scale 1.5; previous/next selected the other image and closing cleared the viewer. Opt-in auto-scroll at eight seconds moved to the next post; the Stop control turned it off, and a reload left it off. No application console errors were reported in that check. The generated tone is a playback test, not a claim about loudspeakers or every physical device.
