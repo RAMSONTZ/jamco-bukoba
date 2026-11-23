@@ -11,6 +11,22 @@
     'Inapakia…':'Loading…','Jaribu tena':'Try again','Umefika mwisho.':'You’re all caught up.',
     'Tuma maoni':'Post comment','Maoni yako':'Your comment','Nakili maoni':'Copy comment','Jibu':'Reply','Penda':'Like',
     'Sikiliza taarifa':'Listen to this update','Wasiliana na JAMCO':'Contact JAMCO','Wasilisha ombi la kuorodheshwa':'Request a listing',
+    'Gundua Bukoba':'Explore Bukoba','Makundi ya Gundua':'Explore categories','Taarifa na huduma':'News and services',
+    'Habari na maeneo':'News and places','Matokeo ya utafutaji':'Search results','Tafuta Bukoba':'Search Bukoba',
+    'Tafuta taarifa, eneo au huduma…':'Search for news, a place or a service…','Tazama yote':'Show all','Menyu kuu':'Main menu','Menyu ya simu':'Mobile menu',
+    'Faragha':'Privacy','Chumba cha habari':'Newsroom','Karibu Bukoba.':'Welcome to Bukoba.','Gundua zaidi':'Explore more',
+    'Matukio ya jamii':'Community events','Usafiri na miundombinu':'Transport and infrastructure','Biashara za karibu':'Local businesses',
+    'Karibu nyumbani.':'Welcome home.','Jamii na Maendeleo Bukoba':'Community and development in Bukoba',
+    'Watu, matukio na hadithi zinazotuunganisha.':'People, events and stories that bring us together.',
+    'Malazi na sehemu za kupumzika':'Accommodation and places to stay','Taarifa na habari za jamii':'Local news and updates',
+    'Shughuli na mikusanyiko':'Events and gatherings','Mandhari na maeneo ya kutembelea':'Sights and destinations','Chakula na ladha za karibu':'Local food and dining',
+    'Boda boda, barabara na safari':'Motorcycle taxis, roads and travel','Huduma na taarifa za afya':'Health services and updates',
+    'Wajasiriamali na biashara za karibu':'Entrepreneurs and local businesses','Muziki, sanaa na burudani':'Music, arts and entertainment',
+    'Shule, masomo na maarifa':'Schools and education','Viwanja, timu na michezo':'Sports grounds, teams and fixtures','Wataalamu na huduma muhimu':'Tradespeople and essential services',
+    'Mada na Story za JAMCO':'Topics and JAMCO Stories','Funga':'Close','Ghairi jibu':'Cancel reply','Hariri':'Edit','Futa':'Delete',
+    'Ripoti':'Report','Umesahau nenosiri?':'Forgot your password?','Jina la kuonekana':'Display name',
+    'Barua pepe':'Email','Nenosiri':'Password','Nimekubali sera ya faragha':'I accept the privacy policy',
+    'Washa mandhari nyeupe':'Switch to light theme','Washa mandhari nyeusi':'Switch to dark theme',
     'Ingia':'Sign in','Fungua akaunti':'Create account','Ruka hadi maudhui':'Skip to content',
   };
   let locale = 'sw';
@@ -26,6 +42,10 @@
     root.querySelectorAll('[data-ui-label]').forEach(el => {
       const value = t(el.dataset.uiLabel);
       if (labels.get(el) !== value) {el.setAttribute('aria-label',value);labels.set(el,value);}
+    });
+    root.querySelectorAll('[data-ui-placeholder]').forEach(el => {
+      const value=t(el.dataset.uiPlaceholder);
+      if(el.placeholder!==value)el.placeholder=value;
     });
     const button = document.querySelector('[data-language-toggle]');
     if (button) {
