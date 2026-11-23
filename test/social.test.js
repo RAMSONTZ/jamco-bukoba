@@ -43,6 +43,21 @@ test('topic filters, image/video filters and media-free notes use stored public 
  const partial=await fetch(host+upload.data.url,{headers:{Range:'bytes=0-31'}});assert.equal(partial.status,206);assert.equal((await partial.arrayBuffer()).byteLength,32);assert.match(partial.headers.get('content-range'),/^bytes 0-31\//);assert.equal((await fetch(host+upload.data.url,{headers:{Range:'bytes=999999999-'}})).status,416);assert.equal((await fetch(host+upload.data.url,{method:'HEAD'})).headers.get('content-length'),String(clip.length));
  const html=await(await fetch(host+'/?mada=serikali')).text();assert.match(html,/"topic":"serikali"/);assert.match(html,/"label":"Serikali"/);
 });
+test('existing municipal notices and development stories appear under the relevant feed topics', async () => {
+ const cases = [
+   ['mikopo-asilimia-kumi', ['serikali', 'matangazo', 'jamii'], 'maendeleo'],
+   ['bukoba-yakagua-miradi', ['serikali', 'maendeleo'], 'matangazo'],
+   ['soko-jipya-bukoba', ['maendeleo'], 'serikali'],
+ ];
+ for (const [slug, topics, unrelatedTopic] of cases) {
+   for (const topic of topics) {
+     const {data} = await api('feed', {slug, topic, media: 'text'});
+     assert.deepEqual(data.posts.map(post => post.slug), [slug]);
+   }
+   const {data} = await api('feed', {slug, topic: unrelatedTopic});
+   assert.deepEqual(data.posts, []);
+ }
+});
 test('media QA fixtures are preview-only and never become production content',async()=>{
  const before=process.env.VERCEL_ENV;try{process.env.VERCEL_ENV='preview';const r=await fetch(host+'/?qa=media'),html=await r.text();assert.equal(r.headers.get('cache-control'),'no-store');assert.match(html,/qa-video-fixture/);assert.equal((await fetch(host+'/__qa/media.mp4',{headers:{Range:'bytes=0-31'}})).status,206);process.env.VERCEL_ENV='production';assert.equal((await fetch(host+'/__qa/media.mp4')).status,404);assert.ok(!(await(await fetch(host+'/?qa=media')).text()).includes('qa-video-fixture'));assert.equal((await api('feed',{slug:'qa-video-fixture'})).data.posts.length,0)}finally{if(before===undefined)delete process.env.VERCEL_ENV;else process.env.VERCEL_ENV=before}
 });
