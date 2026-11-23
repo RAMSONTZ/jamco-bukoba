@@ -1,0 +1,230 @@
+{
+  "habari": {
+    "variants": [
+      {
+        "width": 160,
+        "url": "/discovery/habari-21245d90a6-160.webp",
+        "bytes": 6402
+      },
+      {
+        "width": 320,
+        "url": "/discovery/habari-21245d90a6-320.webp",
+        "bytes": 15238
+      },
+      {
+        "width": 480,
+        "url": "/discovery/habari-21245d90a6-480.webp",
+        "bytes": 26440
+      }
+    ]
+  },
+  "matukio": {
+    "variants": [
+      {
+        "width": 160,
+        "url": "/discovery/matukio-b363120470-160.webp",
+        "bytes": 9020
+      },
+      {
+        "width": 320,
+        "url": "/discovery/matukio-b363120470-320.webp",
+        "bytes": 23134
+      },
+      {
+        "width": 480,
+        "url": "/discovery/matukio-b363120470-480.webp",
+        "bytes": 41222
+      }
+    ]
+  },
+  "usafiri": {
+    "variants": [
+      {
+        "width": 160,
+        "url": "/discovery/usafiri-3a8980554b-160.webp",
+        "bytes": 11108
+      },
+      {
+        "width": 320,
+        "url": "/discovery/usafiri-3a8980554b-320.webp",
+        "bytes": 29976
+      },
+      {
+        "width": 480,
+        "url": "/discovery/usafiri-3a8980554b-480.webp",
+        "bytes": 54480
+      }
+    ]
+  },
+  "afya": {
+    "variants": [
+      {
+        "width": 160,
+        "url": "/discovery/afya-620596fb02-160.webp",
+        "bytes": 5332
+      },
+      {
+        "width": 320,
+        "url": "/discovery/afya-620596fb02-320.webp",
+        "bytes": 12464
+      },
+      {
+        "width": 480,
+        "url": "/discovery/afya-620596fb02-480.webp",
+        "bytes": 21050
+      }
+    ]
+  },
+  "utalii": {
+    "variants": [
+      {
+        "width": 160,
+        "url": "/discovery/utalii-3a2c2f10e4-160.webp",
+        "bytes": 7972
+      },
+      {
+        "width": 320,
+        "url": "/discovery/utalii-3a2c2f10e4-320.webp",
+        "bytes": 20866
+      },
+      {
+        "width": 480,
+        "url": "/discovery/utalii-3a2c2f10e4-480.webp",
+        "bytes": 37514
+      }
+    ]
+  },
+  "migahawa": {
+    "variants": [
+      {
+        "width": 160,
+        "url": "/discovery/migahawa-34b44946e4-160.webp",
+        "bytes": 7488
+      },
+      {
+        "width": 320,
+        "url": "/discovery/migahawa-34b44946e4-320.webp",
+        "bytes": 19716
+      },
+      {
+        "width": 480,
+        "url": "/discovery/migahawa-34b44946e4-480.webp",
+        "bytes": 35726
+      }
+    ]
+  },
+  "biashara": {
+    "variants": [
+      {
+        "width": 160,
+        "url": "/discovery/biashara-d9239e1ae2-160.webp",
+        "bytes": 9552
+      },
+      {
+        "width": 320,
+        "url": "/discovery/biashara-d9239e1ae2-320.webp",
+        "bytes": 26714
+      },
+      {
+        "width": 480,
+        "url": "/discovery/biashara-d9239e1ae2-480.webp",
+        "bytes": 50104
+      }
+    ]
+  },
+  "burudani": {
+    "variants": [
+      {
+        "width": 160,
+        "url": "/discovery/burudani-cc1daec3d8-160.webp",
+        "bytes": 7828
+      },
+      {
+        "width": 320,
+        "url": "/discovery/burudani-cc1daec3d8-320.webp",
+        "bytes": 19412
+      },
+      {
+        "width": 480,
+        "url": "/discovery/burudani-cc1daec3d8-480.webp",
+        "bytes": 34228
+      }
+    ]
+  },
+  "elimu": {
+    "variants": [
+      {
+        "width": 160,
+        "url": "/discovery/elimu-e6e14eb7c0-160.webp",
+        "bytes": 6806
+      },
+      {
+        "width": 320,
+        "url": "/discovery/elimu-e6e14eb7c0-320.webp",
+        "bytes": 16114
+      },
+      {
+        "width": 480,
+        "url": "/discovery/elimu-e6e14eb7c0-480.webp",
+        "bytes": 27012
+      }
+    ]
+  },
+  "huduma": {
+    "variants": [
+      {
+        "width": 160,
+        "url": "/discovery/huduma-9c9651afd1-160.webp",
+        "bytes": 6472
+      },
+      {
+        "width": 320,
+        "url": "/discovery/huduma-9c9651afd1-320.webp",
+        "bytes": 15468
+      },
+      {
+        "width": 480,
+        "url": "/discovery/huduma-9c9651afd1-480.webp",
+        "bytes": 26092
+      }
+    ]
+  },
+  "hoteli": {
+    "variants": [
+      {
+        "width": 160,
+        "url": "/discovery/hoteli-d901e4f87d-160.webp",
+        "bytes": 7616
+      },
+      {
+        "width": 320,
+        "url": "/discovery/hoteli-d901e4f87d-320.webp",
+        "bytes": 21614
+      },
+      {
+        "width": 480,
+        "url": "/discovery/hoteli-d901e4f87d-480.webp",
+        "bytes": 41862
+      }
+    ]
+  },
+  "michezo": {
+    "variants": [
+      {
+        "width": 160,
+        "url": "/discovery/michezo-ab3478c1d8-160.webp",
+        "bytes": 5504
+      },
+      {
+        "width": 320,
+        "url": "/discovery/michezo-ab3478c1d8-320.webp",
+        "bytes": 12952
+      },
+      {
+        "width": 480,
+        "url": "/discovery/michezo-ab3478c1d8-480.webp",
+        "bytes": 21416
+      }
+    ]
+  }
+}

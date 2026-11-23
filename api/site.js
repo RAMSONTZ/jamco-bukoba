@@ -90,7 +90,7 @@ export default async function handler(req,res) {
     if(['/','/admin','/gundua','/shiriki','/akaunti','/hifadhi','/arifa'].includes(path)||/^\/habari\/[a-z0-9-]+$/.test(path)) {
       res.setHeader('Cache-Control','no-store');
       res.setHeader('X-JAMCO-Release','social-20261122');
-      let initial={};
+      let initial=path==='/gundua'?{category:(query.get('category')||'').slice(0,80),q:(query.get('q')||'').slice(0,100)}:{};
       if(path==='/'){initial.feed=await publicFeed(await getDb(),req,res,{limit:8});res.setHeader('Cache-Control','public, max-age=0, s-maxage=10, stale-while-revalidate=20');}
       if(path.startsWith('/habari/')){const slug=path.slice(8);const rows=(await (await getDb()).query("SELECT data,kind,live_at FROM jamco_content WHERE slug=$1 AND state='published' AND live_at<=now() AND (NOT(data ? 'expiresAt') OR (data->>'expiresAt')::timestamptz>now())",[slug])).rows;if(!rows[0])return send(res,404,'text/html; charset=utf-8',socialShell(path));initial={post:{title:rows[0].data.title,body:rows[0].data.body||rows[0].data.summary,date:rows[0].data.date,publisher:rows[0].data.publisher,slug}};}
       return send(res,200,'text/html; charset=utf-8',socialShell(path,initial));
