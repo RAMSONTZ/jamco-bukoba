@@ -288,3 +288,19 @@ test('dedicated studio uses existing staff authorization and stages the login co
  assert.equal(wrong.status,401);
  assert.equal(wrong.data.code,undefined);
 });
+
+test('studio owner can change credentials and published audio has a scannable QR',async()=>{
+ const missing=await fetch(host+'/api/audio-qr/social-workflow-test');
+ assert.equal(missing.status,404);
+ const qr=await fetch(host+'/api/audio-qr/audio-newsroom-note');
+ assert.equal(qr.status,200);
+ assert.equal(qr.headers.get('content-type'),'image/png');
+ assert.equal(Buffer.from(await qr.arrayBuffer()).subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+ const credentials={email:'updated-owner@example.test',displayName:'Mmiliki wa JAMCO',username:'test-studio-owner',newPassword:'New isolated test password'};
+ assert.equal((await api('staff-account',{...credentials,currentPassword:'wrong'},owner)).status,401);
+ assert.equal((await api('staff-account',{...credentials,currentPassword:'Only used by automated test suite'},owner)).status,200);
+ const staff=await api('staff-me',{},owner);
+ assert.equal(staff.data.email,credentials.email);
+ assert.equal(staff.data.displayName,credentials.displayName);
+ assert.equal((await api('staff-login',{email:credentials.username,password:credentials.newPassword,mode:'owner'})).data.code,'staff_code_required');
+});

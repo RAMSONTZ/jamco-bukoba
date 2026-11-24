@@ -1,3 +1,4 @@
+import QRCode from 'qrcode';
 import {readFile} from 'node:fs/promises';
 import {mediaFixture} from '../qa/feed-fixture.js';
 import {feedTopics} from '../public/feed-topics.js';
@@ -103,6 +104,15 @@ export default async function handler(req,res) {
       res.setHeader('Location',origin+(path.startsWith('//')?'/':path));
       return send(res,307,'text/plain','Moved');
     }
+    const audioQr=path.match(/^\/api\/audio-qr\/([a-z0-9-]{1,96})$/);
+    if(audioQr&&['GET','HEAD'].includes(req.method)){
+      const db=await getDb();
+      const post=(await publicFeed(db,req,res,{slug:audioQr[1],limit:1})).posts[0];
+      if(!post?.media.some(item=>item.type==='audio'))return send(res,404,'text/plain','Sauti haipatikani.');
+      res.setHeader('Cache-Control','public, max-age=60');
+      const code=await QRCode.toBuffer(origin+'/habari/'+audioQr[1]+'#sauti',{width:192,margin:3,errorCorrectionLevel:'M'});
+      return send(res,200,'image/png',code);
+    }
     if(path==='/offline-shell'&&['GET','HEAD'].includes(req.method)){
       res.setHeader('Cache-Control','no-store');
       res.setHeader('X-Robots-Tag','noindex');
@@ -132,7 +142,7 @@ export default async function handler(req,res) {
       const data=method==='POST'?await input(req):{};
       const manage=path.startsWith('/api/manage/');
       const result=path.startsWith('/api/social/')?await social(db,req,res,path.slice(12),data):manage?await adminAction(db,req,res,path.slice(12),data):await publicAction(db,req,res,path.slice(5),data);
-      if(manage||/\/(?:admin-publish|admin-moderate|admin-instagram-import|admin-instagram-hide|admin-comment-approve|admin-comment-hide|profile|like|comment|comment-edit|comment-delete|comment-like)$/.test(path))clearPublicFeed();
+      if(manage||/\/(?:admin-publish|admin-moderate|admin-instagram-import|admin-instagram-hide|admin-comment-approve|admin-comment-hide|profile|like|view|comment|comment-edit|comment-delete|comment-like)$/.test(path))clearPublicFeed();
       return json(res,200,result);
     }
     if(!['GET','HEAD'].includes(req.method)) return send(res,405,'text/plain','Method not allowed');
@@ -143,7 +153,7 @@ export default async function handler(req,res) {
     if(path==='/robots.txt') return send(res,200,'text/plain; charset=utf-8','User-agent: *\nDisallow: /admin\nDisallow: /api/\nSitemap: '+origin+'/sitemap.xml\n');
     if(['/','/admin','/admin/mmiliki','/admin/wakala','/gundua','/shiriki','/orodha/ombi','/akaunti','/hifadhi','/arifa'].includes(path)||/^\/habari\/[a-z0-9-]+$/.test(path)) {
       res.setHeader('Cache-Control','no-store');
-      res.setHeader('X-JAMCO-Release','bukoba-20261124-studio');
+      res.setHeader('X-JAMCO-Release','bukoba-20261124-workspace');
       let initial=path==='/gundua'?{category:(query.get('category')||'').slice(0,80),q:(query.get('q')||'').slice(0,100)}:adminOnly?{adminOnly:true}:{};
       if(path==='/'){initial.topic=feedTopics.some(t=>t.key===query.get('mada'))?query.get('mada'):'bukoba';initial.qa=process.env.VERCEL_ENV==='preview'&&query.get('qa')==='media';if(initial.qa)initial.feed=mediaFixture();else{
         const db=await getDb();

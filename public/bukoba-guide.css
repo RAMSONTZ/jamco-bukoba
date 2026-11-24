@@ -32,3 +32,15 @@
 
 [data-studio] .app{display:block;max-width:1120px;margin-inline:auto;padding:0 20px}[data-studio] .center{max-width:none;width:100%;min-height:100dvh;border:0}[data-studio] .sidebar,[data-studio] .rightbar,[data-studio] #dock,[data-studio] .app-availability,[data-studio] .desktop-label,[data-studio] .header-actions a,[data-studio] [data-language-toggle]{display:none}[data-studio] .topbar{display:flex;position:static;border-bottom:1px solid var(--line);padding-inline:10px}[data-studio] .mobile-brand{display:flex}[data-studio] #main{padding-bottom:24px}[data-studio] .newsroom-profile{margin-inline:0}.studio-login{max-width:440px;margin:clamp(26px,8vw,75px) auto;background:var(--surface);border:1px solid var(--line);border-radius:18px}.studio-login h1{margin:0 0 18px}.studio-login [data-password-fields]{display:grid;gap:12px}.studio-login [hidden]{display:none}.studio-settings summary{cursor:pointer;padding:6px 10px;border:1px solid var(--line);border-radius:8px}.studio-settings>div{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
 @media(max-width:520px){[data-studio] .app{padding:0 10px}[data-studio] .newsroom-workspace .admin-tabs{padding-inline:0}}
+[data-studio] .studio-work{display:grid;grid-template-columns:180px minmax(0,1fr);gap:24px;align-items:start}
+[data-studio] .studio-work .admin-tabs{display:flex;flex-direction:column;align-items:stretch;position:sticky;top:12px;padding:8px;margin:0;border-right:1px solid var(--line);overflow:visible}
+[data-studio] .studio-work .admin-tabs .tab{border:0;text-align:left}
+[data-studio] .studio-work #admin-panel{min-width:0}
+[data-studio] .studio-locations{list-style:none;padding:0}
+[data-studio] .studio-locations li{display:flex;justify-content:space-between;text-transform:capitalize;padding:9px 0;border-bottom:1px solid var(--line)}
+[data-view-count],.post-views{font-size:.82rem;color:var(--muted)}
+.post-actions [data-like][aria-pressed=true]{color:#ed5273}
+.comment-form:not(:focus-within):not(:has(textarea:not(:placeholder-shown))) :is(.comment-emoji,.comment-stickers){display:none}
+.comment-form:has(#reply-to:empty) [data-cancel-reply]{display:none}
+.voice-qr{margin:12px 0}.voice-qr img{display:block;background:white;margin:12px 0;border-radius:6px}
+@media(max-width:700px){[data-studio] .studio-work{display:block}[data-studio] .studio-work .admin-tabs{position:static;flex-direction:row;flex-wrap:nowrap;align-items:center;overflow-x:auto;white-space:nowrap;border-right:0;border-bottom:1px solid var(--line)}[data-studio] .studio-work .admin-tabs .tab{white-space:nowrap}}
