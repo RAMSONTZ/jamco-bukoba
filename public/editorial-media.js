@@ -67,6 +67,8 @@
     }
     let recorder, stream, timer;
     const cleanup = () => {clearTimeout(timer);stream?.getTracks().forEach(track => track.stop());stream = null;};
+    const detach=new MutationObserver(()=>{if(!root.isConnected){cleanup();detach.disconnect();}});
+    detach.observe(document.body,{childList:true,subtree:true});
     window.addEventListener('pagehide', cleanup, {once:true});
     start.onclick = async () => {
       if (recorder?.state === 'recording') {recorder.stop();return;}
@@ -77,9 +79,10 @@
         recorder = new MediaRecorder(stream, preferred ? {mimeType:preferred, audioBitsPerSecond:64000} : {audioBitsPerSecond:64000});
         const chunks = [];
         recorder.ondataavailable = event => {if (event.data.size) chunks.push(event.data);};
-        recorder.onerror = () => {cleanup();start.disabled=false;start.textContent='Rekodi sauti';onError('Rekodi haikuhifadhiwa.');};
+        recorder.onerror = () => {delete start.dataset.recording;cleanup();start.disabled=false;start.textContent='Rekodi sauti';onError('Rekodi haikuhifadhiwa.');};
         recorder.onstop = async () => {
-          cleanup();
+          delete start.dataset.recording;cleanup();
+          if(!root.isConnected)return;
           const type = recorder.mimeType.split(';')[0];
           const ext = type === 'audio/mp4' ? 'm4a' : type.split('/')[1] || 'webm';
           start.disabled = true;
@@ -88,7 +91,9 @@
           catch (error) {onError(error.message);}
           finally {start.disabled = false;}
         };
+        if(!root.isConnected){cleanup();return;}
         recorder.start(500);
+        start.dataset.recording='1';
         timer = setTimeout(() => {if (recorder.state === 'recording') recorder.stop();}, 600_000);
         start.textContent = 'Maliza rekodi';
         state.textContent = 'Inarekodi…';

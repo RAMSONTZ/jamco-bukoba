@@ -1,4 +1,4 @@
-const shellCache='jamco-shell-v1';
+const shellCache='jamco-shell-v2';
 const assetCache='jamco-assets-v1';
 const videoCache='jamco-watched-v1';
 const offlineShell='/offline-shell';
@@ -22,7 +22,7 @@ self.addEventListener('install',event=>event.waitUntil((async()=>{
 })()));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{
  const keys=await caches.keys();
- await Promise.all(keys.filter(key=>key.startsWith('jamco-bukoba-')||key.startsWith('jamco-feed-')).map(key=>caches.delete(key)));
+ await Promise.all(keys.filter(key=>key==='jamco-shell-v1'||key.startsWith('jamco-bukoba-')||key.startsWith('jamco-feed-')).map(key=>caches.delete(key)));
  await self.clients.claim();
 })()));
 

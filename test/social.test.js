@@ -15,13 +15,19 @@ before(async()=>{await migrate();server=createServer(handler).listen(0,'127.0.0.
 test('guest routes, feed and protected APIs',async()=>{for(const p of ['/','/gundua','/shiriki','/hifadhi','/akaunti','/admin'])assert.equal((await fetch(host+p)).status,200,p);assert.ok((await api('feed')).data.posts.length);assert.equal((await api('like',{slug})).status,401);assert.equal((await api('admin-dashboard')).status,401)});
 test('owner setup and mandatory MFA',async()=>{const d={email:'owner@example.test',password:'Only used by automated test suite'};assert.equal((await api('staff-setup',{...d,key:'wrong'})).status,403);const r=await api('staff-setup',{...d,key:process.env.JAMCO_SETUP_KEY});assert.equal(r.status,200,JSON.stringify(r.data));owner=r.cookie;assert.match(r.headers.get('set-cookie'),/HttpOnly; SameSite=Strict/);assert.equal((await api('admin-dashboard',{},owner)).status,401);assert.equal((await post('manage/list',{},owner)).status,401);await enroll(owner);assert.equal((await api('admin-dashboard',{},owner)).status,200)});
 test('registration cannot grant role or verification; email tokens single use',async()=>{let r=await api('register',{email:'alice@example.test',password:'Alice secure test password only',name:'Alice',consent:true,role:'owner',verified:true});assert.equal(r.status,200);alice=r.cookie;assert.equal(r.data.verificationSent,false);assert.equal((await api('me',{},alice)).data.user.verified,false);const existing='bukoba-yakagua-miradi';
-const pending=await api('comment',{slug:existing,body:'Maoni yanayosubiri 🙏'},alice);
-assert.equal(pending.status,200);
-assert.equal(pending.data.pending,true);
-assert.equal((await api('comments',{slug:existing})).data.comments.length,0);
-assert.equal((await api('admin-comment-approve',{id:pending.data.id},alice)).status,401);
-assert.equal((await api('admin-comment-approve',{id:pending.data.id},owner)).status,200);
-assert.equal((await api('comments',{slug:existing})).data.comments[0].body,'Maoni yanayosubiri 🙏');aliceId=await verify(alice,'1');r=await api('register',{email:'bob@example.test',password:'Bob secure test password only',name:'Bob',consent:true});assert.equal(r.status,200);bob=r.cookie;bobId=await verify(bob,'2');assert.equal((await api('admin-dashboard',{},alice)).status,401)});
+const comment=await api('comment',{slug:existing,body:'Maoni ya papo hapo 🙏'},alice);
+assert.equal(comment.status,200);
+assert.equal(comment.data.pending,false);
+assert.equal((await api('comments',{slug:existing})).data.comments[0].body,'Maoni ya papo hapo 🙏');
+assert.equal((await api('comment-edit',{id:comment.data.id,body:'Nimehariri maoni yangu'},alice)).status,200);
+assert.equal((await api('admin-comments',{},alice)).status,401);
+assert.ok((await api('admin-comments',{},owner)).data.items.some(item=>item.id===comment.data.id));
+const avatarBytes=await readFile(new URL('../public/brand/icon-48.png',import.meta.url));
+const avatar=await api('upload',{file:'data:image/png;base64,'+avatarBytes.toString('base64')},alice);
+assert.equal(avatar.status,200);
+assert.equal((await api('profile',{avatar:avatar.data.id},alice)).status,200);
+assert.equal((await api('me',{},alice)).data.user.avatar,avatar.data.url);
+aliceId=await verify(alice,'1');r=await api('register',{email:'bob@example.test',password:'Bob secure test password only',name:'Bob',consent:true});assert.equal(r.status,200);bob=r.cookie;bobId=await verify(bob,'2');assert.equal((await api('admin-dashboard',{},alice)).status,401)});
 test('validated media upload, private draft, publication visible to second client',async()=>{assert.equal((await api('upload',{file:'data:image/png;base64,'+Buffer.from('not an image file at all').toString('base64')},owner)).status,400);const b=await readFile(new URL('../public/brand/icon-48.png',import.meta.url));const r=await api('upload',{file:'data:image/png;base64,'+b.toString('base64')},owner);assert.equal(r.status,200,JSON.stringify(r.data));assert.equal((await fetch(host+r.data.url)).status,404);assert.equal((await api('admin-publish',{...content,media:[r.data],story:true},owner)).status,200);const d=(await api('feed',{slug},bob)).data.posts[0];assert.equal(d.title,content.title);assert.equal(d.media.length,1);assert.equal((await api('stories')).data.items.length,1);assert.ok(!('reporter'in d));assert.equal((await fetch(host+r.data.url)).status,200);assert.equal((await api('admin-publish',content,alice)).status,401)});
 test('concurrent likes deduplicate and unlike persists',async()=>{const rs=await Promise.all(Array.from({length:8},()=>api('like',{slug,active:true},alice)));rs.forEach(r=>assert.equal(r.status,200));assert.equal((await api('feed',{slug},bob)).data.posts[0].likes,1);assert.equal((await api('like',{slug,active:false},alice)).data.likes,0)});
 test('threaded comments, ownership checks, likes and reply notifications',async()=>{let r=await api('comment',{slug,body:'Alice first comment'},alice);assert.equal(r.status,200,JSON.stringify(r.data));commentId=r.data.id;r=await api('comment',{slug,body:'Bob reply',parent:commentId},bob);assert.equal(r.status,200);replyId=r.data.id;assert.equal((await api('comments',{slug})).data.comments[1].parent_id,commentId);assert.equal((await api('comment-edit',{id:commentId,body:'hijack'},bob)).status,403);assert.equal((await api('comment-delete',{id:commentId},bob)).status,403);assert.equal((await api('comment-edit',{id:commentId,body:'Alice updated'},alice)).status,200);assert.equal((await api('comment-like',{id:commentId,active:true},bob)).status,200);assert.equal((await api('comments',{slug})).data.comments[0].likes,1);assert.ok((await api('notifications',{},alice)).data.items.some(x=>x.type==='replies'))});
@@ -244,4 +250,17 @@ test('the offline shell is public even when fetched by a signed-in browser',asyn
  assert.match(shell,/"offline":true/);
  assert.match(shell,/id="jamco-install"/);
  assert.doesNotMatch(shell,/owner@example\.test|alice@example\.test|"post":|"feed":/);
+});
+
+test('newsroom publishes short notes or audio-only announcements and receives support messages',async()=>{
+ const notice={...content,slug:'short-newsroom-note',title:'Taarifa fupi',body:'Karibu.'};
+ assert.equal((await api('admin-publish',notice,owner)).status,200);
+ assert.equal((await api('admin-publish',{...notice,slug:'empty-newsroom-note',body:''},owner)).status,400);
+ const voice=await api('synthesize',{text:'Karibu Bukoba leo.',language:'sw'},owner);
+ assert.equal(voice.status,200);
+ const audio={...notice,slug:'audio-newsroom-note',body:'',media:[{...voice.data,alt:'Muziki'}]};
+ assert.equal((await api('admin-publish',audio,owner)).status,200);
+ assert.equal((await api('feed',{slug:audio.slug})).data.posts[0].media[0].alt,'Muziki');
+ assert.equal((await post('tip',{email:'support-test@example.test',name:'Jaribio',message:'Nahitaji msaada wa kutumia huduma.',topic:'support',consent:true})).status,200);
+ assert.ok((await api('admin-intake',{},owner)).data.items.some(item=>item.email==='support-test@example.test'&&item.data.topic==='support'));
 });
