@@ -134,6 +134,95 @@
   }catch{}
   return null;
  }
+ const recentKey='jamco-recent-photo-v1';
+ const historyKey='jamco-navigation-v1';
+ function stored(key,fallback){
+  try{return JSON.parse(local.read(key))||fallback;}catch{return fallback;}
+ }
+ function safeRoute(raw){
+  const url=new URL(raw,location.href);
+  if(url.origin!==location.origin||url.searchParams.has('qa')||
+    !/^\/(?:$|gundua\/?$|(?:habari|picha|tv)\/[a-z0-9-]+\/?$|(?:wasiliana|faragha|picha|tv|matukio|biashara|habari)\/?$)/.test(url.pathname))return null;
+  url.hash='';
+  return url;
+ }
+ function sendToWorker(data){
+  const worker=navigator.serviceWorker;
+  if(!worker)return;
+  worker.ready.then(reg=>reg.active?.postMessage(data)).catch(()=>{});
+ }
+ function prefetch(raw){
+  if(isOffline()||document.hidden||navigator.connection?.saveData||/2g/.test(navigator.connection?.effectiveType||''))return;
+  const url=safeRoute(raw);
+  if(!url||url.href===location.href.split('#')[0])return;
+  const previous=prefetched.get(url.href)||0;
+  if(Date.now()-previous<30000)return;
+  if(prefetched.size>=24)prefetched.delete(prefetched.keys().next().value);
+  prefetched.set(url.href,Date.now());
+  sendToWorker({type:'jamco-prefetch-page',url:url.href});
+ }
+ const prefetched=new Map();
+ function recentPictures(){return stored(recentKey,[]).slice(0,5);}
+ const photoTargets=new WeakMap();
+ let photoObserver;
+ function recordPicture(img){
+  const article=img.closest('.post[data-post]');
+  const picture=img.currentSrc;
+  if(!article||!picture||!img.naturalWidth)return;
+  const url=new URL(picture,location.href);
+  if(url.origin!==location.origin||!/^\/(?:media|photos)\//.test(url.pathname))return;
+  const slug=article.dataset.post;
+  if(!/^[a-z0-9-]{1,96}$/.test(slug))return;
+  const previous=recentPictures();
+  if(previous[0]?.url===url.href)return;
+  const entries=[{url:url.href,slug,title:article.querySelector('h1,h2')?.textContent?.slice(0,180)||'JAMCO'},...previous.filter(item=>item.url!==url.href)].slice(0,5);
+  local.write(recentKey,JSON.stringify(entries));
+  if(!isOffline())sendToWorker({type:'jamco-pin-pictures',urls:entries.map(item=>item.url)});
+ }
+ function observePictures(root){
+  photoObserver??=typeof IntersectionObserver==='function'?new IntersectionObserver(items=>{
+   for(const entry of items){
+    const img=entry.target;
+    photoTargets.set(img,entry.isIntersecting);
+    if(entry.isIntersecting)recordPicture(img);
+   }
+  },{threshold:.3}):null;
+  if(!photoObserver)return;
+  for(const img of root.querySelectorAll('.post .media-slide img')){
+   if(photoTargets.has(img))continue;
+   photoTargets.set(img,false);
+   img.addEventListener('load',()=>{if(photoTargets.get(img))recordPicture(img);});
+   photoObserver.observe(img);
+  }
+ }
+ function predict(){
+  if(document.documentElement.dataset.studio==='true')return;
+  const current=safeRoute(location.href);
+  if(current){
+   const route=current.pathname+current.search;
+   const history=stored(historyKey,[]).filter(item=>item.path!==route).slice(0,11);
+   const last=stored(historyKey,[]).find(item=>item.path===route);
+   history.unshift({path:route,visits:(last?.visits||0)+1});
+   local.write(historyKey,JSON.stringify(history));
+  }
+  let pending;
+  const schedule=event=>{
+   clearTimeout(pending);
+   const link=event.target.closest?.('a[href]');
+   if(!link||link.target==='_blank'||link.hasAttribute('download'))return;
+   if(event.type==='pointerdown')prefetch(link.href);
+   else pending=setTimeout(()=>prefetch(link.href),110);
+  };
+  for(const name of ['pointerover','pointerdown','focusin'])document.addEventListener(name,schedule,{passive:true});
+  const idle=()=>{
+   const likely=stored(historyKey,[]).filter(item=>current&&item.path!==current.pathname+current.search)
+    .sort((a,b)=>b.visits-a.visits)[0]?.path;
+   prefetch(likely||(current?.pathname==='/'?'/gundua':'/'));
+  };
+  if('requestIdleCallback'in window)requestIdleCallback(idle,{timeout:2500});
+  else setTimeout(idle,1700);
+ }
+
  async function warm(){
   if(!('serviceWorker'in navigator)||isOffline())return;
   const registration=await navigator.serviceWorker.ready;
@@ -156,6 +245,7 @@
  });
  document.addEventListener('DOMContentLoaded',()=>{
   update();
+  predict();
   new MutationObserver(cleanupMedia).observe(document.body,{childList:true,subtree:true});
   document.querySelector('#jamco-install')?.addEventListener('click',async()=>{
    if(installEvent){
@@ -172,5 +262,5 @@
    dialog.querySelector('button').onclick=()=>{if(dialog.close)dialog.close();else dialog.removeAttribute('open');};
   });
  });
- window.JamcoOffline={isOffline,setDegraded,offlineError,networkError,read,write,scope,rememberAccount,lastAccount,beginLogout,finishLogout,logoutPending,watch,warm,recentPost,prepareMedia};
+ window.JamcoOffline={isOffline,setDegraded,offlineError,networkError,read,write,scope,rememberAccount,lastAccount,beginLogout,finishLogout,logoutPending,watch,warm,recentPost,prepareMedia,recentPictures,observePictures};
 })();

@@ -1,5 +1,7 @@
-const shellCache='jamco-shell-v2';
+const shellCache='jamco-shell-v3';
 const assetCache='jamco-assets-v1';
+const pageCache='jamco-public-pages-v1';
+const recentCache='jamco-recent-pictures-v1';
 const videoCache='jamco-watched-v1';
 const offlineShell='/offline-shell';
 const shellFiles=[
@@ -9,7 +11,7 @@ const shellFiles=[
  '/brand/icon-192.png','/brand/icon-512.png','/brand/jamco-logo-display.webp',
 ];
 const mediaPath=/^\/media\/[a-f\d-]{36}$/;
-const shellRoutes=/^\/(?:$|gundua\/?$|akaunti\/?$|arifa\/?$|hifadhi\/?$|shiriki\/?$|orodha\/ombi\/?$|habari\/[a-z0-9-]+\/?$|admin(?:\/(?:mmiliki|wakala))?\/?$|(?:wasiliana|faragha|picha|tv|matukio|biashara|habari)\/?$)/;
+const shellRoutes=/^\/(?:$|gundua\/?$|akaunti\/?$|arifa\/?$|hifadhi\/?$|shiriki\/?$|orodha\/ombi\/?$|(?:habari|picha|tv)\/[a-z0-9-]+\/?$|admin(?:\/(?:mmiliki|wakala))?\/?$|(?:wasiliana|faragha|picha|tv|matukio|biashara|habari)\/?$)/;
 const assets=/^\/(?:photos\/|discovery\/|brand\/|assets\/|(?:theme|social|feed|discovery|bukoba-guide|editorial-media|jamco-language|offline|service-categories|staff-space|manifest)\.)/;
 const maxMediaSize=20_000_000;
 const maxMediaTotal=60_000_000;
@@ -22,20 +24,57 @@ self.addEventListener('install',event=>event.waitUntil((async()=>{
 })()));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{
  const keys=await caches.keys();
- await Promise.all(keys.filter(key=>key==='jamco-shell-v1'||key.startsWith('jamco-bukoba-')||key.startsWith('jamco-feed-')).map(key=>caches.delete(key)));
+ await Promise.all(keys.filter(key=>(key==='jamco-shell-v1'||key==='jamco-shell-v2')||key.startsWith('jamco-bukoba-')||key.startsWith('jamco-feed-')).map(key=>caches.delete(key)));
  await self.clients.claim();
 })()));
 
-async function navigate(request){
- try{const response=await fetch(request);if(response.status<500)return response;}
- catch{}
- return (await caches.match(offlineShell,{cacheName:shellCache}))||
+const safePage=url=>url.origin===self.location.origin&&!url.searchParams.has('qa')&&
+ /^\/(?:$|gundua\/?$|(?:habari|picha|tv)\/[a-z0-9-]+\/?$|(?:wasiliana|faragha|picha|tv|matukio|biashara|habari)\/?$)/.test(url.pathname);
+const trimCache=async(cache,limit)=>{
+ const keys=await cache.keys();
+ await Promise.all(keys.slice(0,Math.max(0,keys.length-limit)).map(key=>cache.delete(key)));
+};
+async function savePage(cache,key,response){
+ if(response.status!==200||response.redirected||!response.headers.get('Content-Type')?.startsWith('text/html'))return;
+ const headers=new Headers(response.headers);
+ headers.delete('Content-Encoding');headers.delete('Content-Length');headers.delete('Set-Cookie');
+ headers.set('X-Jamco-Saved',String(Date.now()));
+ await cache.delete(key);
+ await cache.put(key,new Response(response.body,{headers}));
+ await trimCache(cache,20);
+}
+const pageJobs=new Map();
+function prefetchPage(url){
+ if(!safePage(url)||pageJobs.size>=2)return Promise.resolve();
+ if(pageJobs.has(url.href))return pageJobs.get(url.href);
+ const job=(async()=>{
+  const cache=await caches.open(pageCache);
+  const hit=await cache.match(url.href);
+  if(Date.now()-Number(hit?.headers.get('X-Jamco-Saved'))<30000)return;
+  const response=await fetch(url.href,{credentials:'omit',redirect:'error'});
+  await savePage(cache,url.href,response);
+ })().catch(()=>{}).finally(()=>pageJobs.delete(url.href));
+ pageJobs.set(url.href,job);return job;
+}
+async function navigate(event,request,url){
+ const cache=safePage(url)?await caches.open(pageCache).catch(()=>null):null;
+ const hit=cache?await cache.match(url.href).catch(()=>null):null;
+ if(hit&&Date.now()-Number(hit.headers.get('X-Jamco-Saved'))<30000){return hit;}
+ try{
+  const response=await fetch(request,hit&&typeof AbortSignal.timeout==='function'?{signal:AbortSignal.timeout(2500)}:undefined);
+  if(response.status<500){
+   if(cache&&response.status===200&&!response.redirected)event.waitUntil(savePage(cache,url.href,response.clone()).catch(()=>{}));
+   if(cache&&(response.status===404||response.status===410))event.waitUntil(cache.delete(url.href).catch(()=>{}));
+   return response;
+  }
+ }catch{}
+ return hit||(await caches.match(offlineShell,{cacheName:shellCache}))||
   new Response('JAMCO · Unganisha intaneti kisha ujaribu tena.',{status:503,headers:{'Content-Type':'text/plain; charset=utf-8'}});
 }
 async function lookupAsset(event,request,isUpload){
  const cache=await caches.open(assetCache);
  const key=isUpload?new Request(request.url,{credentials:'omit'}):request;
- const cached=await cache.match(key);
+ const cached=await cache.match(key)||(request.destination==='image'&&await caches.match(key,{cacheName:recentCache}));
  if(cached)return cached;
  try{
   const response=await fetch(request);
@@ -109,7 +148,7 @@ self.addEventListener('fetch',event=>{
  const req=event.request,url=new URL(req.url);
  if(req.method!=='GET'||url.origin!==self.location.origin)return;
  if(req.mode==='navigate'){
-  if(shellRoutes.test(url.pathname))event.respondWith(navigate(req));
+  if(shellRoutes.test(url.pathname)||safePage(url))event.respondWith(navigate(event,req,url));
   return;
  }
  if(mediaPath.test(url.pathname)){
@@ -131,8 +170,27 @@ async function warmPictures(urls){
  const keys=await cache.keys();
  await Promise.all(keys.slice(0,Math.max(0,keys.length-200)).map(key=>cache.delete(key)));
 }
+let recentQueue=Promise.resolve();
+async function pinPictures(values){
+ const source=await caches.open(assetCache), pinned=await caches.open(recentCache);
+ const urls=new Set(values.slice(0,5).map(value=>new URL(value,self.location.origin)).filter(url=>
+  url.origin===self.location.origin&&(mediaPath.test(url.pathname)||/^\/photos\//.test(url.pathname))).map(url=>url.href));
+ await Promise.allSettled([...urls].map(async url=>{
+  if(await pinned.match(url))return;
+  const response=await source.match(url)||await fetch(url,{credentials:'omit'});
+  if(publicMedia(response)&&response.headers.get('Content-Type')?.startsWith('image/'))await pinned.put(url,response);
+ }));
+ await Promise.all((await pinned.keys()).filter(key=>!urls.has(key.url)).map(key=>pinned.delete(key)));
+}
 let saveQueue=Promise.resolve();
 self.addEventListener('message',event=>{
+ if(event.data?.type==='jamco-prefetch-page'&&typeof event.data.url==='string'){
+  event.waitUntil(prefetchPage(new URL(event.data.url,self.location.origin)));return;
+ }
+ if(event.data?.type==='jamco-pin-pictures'&&Array.isArray(event.data.urls)){
+  recentQueue=recentQueue.then(()=>pinPictures(event.data.urls)).catch(()=>{});
+  event.waitUntil(recentQueue);return;
+ }
  if(event.data?.type==='jamco-warm-pictures'&&Array.isArray(event.data.urls)){event.waitUntil(warmPictures(event.data.urls).catch(()=>{}));return;}
  if(event.data?.type!=='jamco-watched'||typeof event.data.url!=='string')return;
  saveQueue=saveQueue.then(()=>storeWatched(new URL(event.data.url,self.location.origin))).catch(()=>{});
