@@ -44,5 +44,6 @@
       "src": "/(.*)",
       "dest": "/api/site?__path=/$1"
     }
-  ]
+  ],
+  "buildCommand": "env -u VERCEL -u VERCEL_ENV -u DATABASE_URL -u JAMCO_STAGING_DATABASE_URL -u RESEND_API_KEY -u JAMCO_EMAIL_FROM npm test"
 }

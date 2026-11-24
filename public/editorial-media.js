@@ -35,7 +35,7 @@
 
   async function upload(file, api, progress = () => {}) {
     const mime = mimeOf(file);
-    const body = mime === 'image' ? await optimizePhoto(file) : file;
+    const body = file; // Store source bytes; server derives display thumbnails separately.
     const size = body.size;
     if (!size || size > (mime.startsWith('audio/') ? 10_000_000 : 20_000_000)) {
       throw Error('Faili imezidi kikomo. Video na picha hadi MB 20, sauti hadi MB 10.');
@@ -65,13 +65,13 @@
       state.textContent = 'Unaweza kupakia faili ya sauti kwenye kifaa hiki.';
       return;
     }
-    let recorder, stream, timer;
-    const cleanup = () => {clearTimeout(timer);stream?.getTracks().forEach(track => track.stop());stream = null;};
+    let recorder, stream, timer, context, frame, previewUrl;const wave=document.createElement('canvas');wave.width=480;wave.height=64;wave.className='record-wave';wave.hidden=true;const review=document.createElement('div');review.className='record-review';state.after(wave,review);
+    const cleanup = () => {clearTimeout(timer);cancelAnimationFrame(frame);context?.close().catch(()=>{});context=null;stream?.getTracks().forEach(track => track.stop());stream = null;wave.hidden=true;};
     const detach=new MutationObserver(()=>{if(!root.isConnected){cleanup();detach.disconnect();}});
     detach.observe(document.body,{childList:true,subtree:true});
     window.addEventListener('pagehide', cleanup, {once:true});
     start.onclick = async () => {
-      if (recorder?.state === 'recording') {recorder.stop();return;}
+      if (recorder?.state === 'recording') {recorder.stop();return;}if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null;}review.replaceChildren();
       start.disabled = true;
       try {
         stream = await navigator.mediaDevices.getUserMedia({audio:true});
@@ -87,12 +87,11 @@
           const ext = type === 'audio/mp4' ? 'm4a' : type.split('/')[1] || 'webm';
           start.disabled = true;
           start.textContent = 'Rekodi sauti';
-          try {await onFile(new File(chunks, 'tangazo.' + ext, {type}));}
-          catch (error) {onError(error.message);}
-          finally {start.disabled = false;}
+          const file=new File(chunks,'tangazo.'+ext,{type});previewUrl=URL.createObjectURL(file);const player=document.createElement('audio');player.controls=true;player.src=previewUrl;const use=document.createElement('button');use.type='button';use.className='secondary';use.textContent='Tumia rekodi';const discard=document.createElement('button');discard.type='button';discard.className='secondary';discard.textContent='Rekodi upya';review.replaceChildren(player,use,discard);state.textContent='Sikiliza kabla ya kutumia rekodi.';start.disabled=false;discard.onclick=()=>{player.pause();start.click()};use.onclick=async()=>{use.disabled=discard.disabled=start.disabled=true;try{await onFile(file);URL.revokeObjectURL(previewUrl);previewUrl=null;review.replaceChildren()}catch(error){onError(error.message);use.disabled=discard.disabled=false}finally{start.disabled=false}};
         };
         if(!root.isConnected){cleanup();return;}
         recorder.start(500);
+        const started=performance.now();wave.hidden=false;try{const AudioCtx=window.AudioContext||window.webkitAudioContext;context=new AudioCtx();const analyser=context.createAnalyser();analyser.fftSize=512;context.createMediaStreamSource(stream).connect(analyser);const samples=new Uint8Array(analyser.fftSize),ctx=wave.getContext('2d');const draw=()=>{if(recorder.state!=='recording')return;analyser.getByteTimeDomainData(samples);ctx.clearRect(0,0,wave.width,wave.height);ctx.strokeStyle='#c79e68';ctx.lineWidth=2;ctx.beginPath();for(let i=0;i<samples.length;i++){const x=i/(samples.length-1)*wave.width,y=samples[i]/255*wave.height;i?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.stroke();const secs=Math.floor((performance.now()-started)/1000);state.textContent='Inarekodi · '+Math.floor(secs/60)+':'+String(secs%60).padStart(2,'0');frame=requestAnimationFrame(draw)};draw()}catch{}
         start.dataset.recording='1';
         timer = setTimeout(() => {if (recorder.state === 'recording') recorder.stop();}, 600_000);
         start.textContent = 'Maliza rekodi';

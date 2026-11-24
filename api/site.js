@@ -4,6 +4,7 @@ import {mediaFixture} from '../qa/feed-fixture.js';
 import {feedTopics} from '../public/feed-topics.js';
 import {transformImage} from '../lib/media.js';
 import {publicFeed,clearPublicFeed} from '../lib/public-feed.js';
+import {mediaLibrary} from '../lib/media-library.js';
 import {social} from '../lib/social.js';
 import {today} from '../lib/bukoba-today.js';
 import {socialShell} from '../lib/social-pages.js';
@@ -91,13 +92,14 @@ export default async function handler(req,res) {
   security(res);
   const parsed = new URL(req.url,'http://internal');
   const host=(req.headers.host||'').toLowerCase();
-  const adminOnly=host.split(':')[0]===adminHost;
+  const adminOnly=host.split(':')[0]===adminHost||(process.env.VERCEL_ENV==='preview'&&parsed.searchParams.get('studio-preview')==='1');
   const requestedPath = (parsed.pathname==='/api/site' && typeof req.query?.__path==='string' ? req.query.__path : parsed.pathname).replace(/\/$/,'') || '/';
   const path=adminOnly&&requestedPath==='/'?'/admin/mmiliki':requestedPath;
   const query=parsed.searchParams;
   if(adminOnly)res.setHeader('X-Robots-Tag','noindex, nofollow');
   if(['/admin','/admin/mmiliki'].includes(path))res.setHeader('Permissions-Policy','camera=(), microphone=(self), geolocation=()');
   try {
+    if(process.env.VERCEL&&host==='jamco-bukoba.vercel.app'&&['GET','HEAD'].includes(req.method)&&studioPages.has(path)){res.setHeader('Location','https://'+adminHost+'/'+parsed.search);return send(res,307,'text/plain','Moved');}
     if(adminOnly&&['GET','HEAD'].includes(req.method)&&!studioPages.has(path)&&!path.startsWith('/api/')&&!path.startsWith('/media/')){
       if(path==='/robots.txt')return send(res,200,'text/plain; charset=utf-8','User-agent: *\nDisallow: /\n');
       if(path==='/offline-shell')return send(res,404,'text/plain','Not found');
@@ -124,6 +126,10 @@ export default async function handler(req,res) {
       const result=await today(await getDb());
       res.setHeader('Cache-Control','public, max-age=0, s-maxage=15');
       return send(res,200,'application/json; charset=utf-8',JSON.stringify(result));
+    }
+    if(path==='/api/library'){
+      if(!['GET','HEAD'].includes(req.method))return json(res,405,{message:'Method not allowed'});
+      return json(res,200,await mediaLibrary(await getDb(),Object.fromEntries(query)));
     }
     if(path==='/api/feed'){
       if(!['GET','HEAD'].includes(req.method))return json(res,405,{message:'Method not allowed'});
