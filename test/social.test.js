@@ -214,3 +214,34 @@ test('an optional featured announcement is included on its specified day and ord
  assert.ok(!schedule.items.some(item=>item.slug==='ordinary-today-test'));
  assert.equal((await api('admin-publish',{...notice,highlightDay:'2026-02-30'},owner)).status,400);
 });
+
+test('active member and MFA staff sessions renew without asking for credentials',async()=>{
+ const db=await getDb();
+ const signed=await api('login',{email:'alice@example.test',password:'Alice secure test password only'});
+ assert.equal(signed.status,200);
+ assert.match(signed.headers.get('set-cookie'),/Max-Age=31536000/);
+ const memberDigest=sha(signed.cookie.split('=')[1]);
+ await db.query("UPDATE jamco_community_sessions SET expires_at=now()+interval '2 days' WHERE digest=$1",[memberDigest]);
+ const member=await api('me',{},signed.cookie);
+ assert.equal(member.data.user.id,aliceId);
+ assert.ok(!('expires_at' in member.data.user));
+ assert.match(member.headers.get('set-cookie'),/Max-Age=31536000/);
+ const staffDigest=sha(owner.split('=')[1]);
+ await db.query("UPDATE jamco_sessions SET expires_at=now()+interval '1 day' WHERE digest=$1",[staffDigest]);
+ const staff=await api('staff-me',{},owner);
+ assert.equal(staff.status,200);
+ assert.equal(staff.data.mfa,true);
+ assert.match(staff.headers.get('set-cookie'),/Max-Age=31536000/);
+ const closed=await api('logout',{},signed.cookie);
+ assert.match(closed.headers.get('set-cookie'),/Max-Age=0/);
+ assert.equal((await api('me',{},signed.cookie)).data.user,null);
+});
+test('the offline shell is public even when fetched by a signed-in browser',async()=>{
+ const result=await fetch(host+'/offline-shell',{headers:{Cookie:owner}});
+ const shell=await result.text();
+ assert.equal(result.status,200);
+ assert.equal(result.headers.get('cache-control'),'no-store');
+ assert.match(shell,/"offline":true/);
+ assert.match(shell,/id="jamco-install"/);
+ assert.doesNotMatch(shell,/owner@example\.test|alice@example\.test|"post":|"feed":/);
+});

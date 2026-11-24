@@ -90,6 +90,11 @@ export default async function handler(req,res) {
   const query=parsed.searchParams;
   if(['/admin','/admin/mmiliki'].includes(path))res.setHeader('Permissions-Policy','camera=(), microphone=(self), geolocation=()');
   try {
+    if(path==='/offline-shell'&&['GET','HEAD'].includes(req.method)){
+      res.setHeader('Cache-Control','no-store');
+      res.setHeader('X-Robots-Tag','noindex');
+      return send(res,200,'text/html; charset=utf-8',socialShell('/',{offline:true}));
+    }
     if(path.startsWith('/__qa/')){if(process.env.VERCEL_ENV!=='preview'||path!=='/__qa/media.mp4')return send(res,404,'text/plain','Not found');res.setHeader('Cache-Control','no-store');return sendBinary(req,res,{mime:'video/mp4',data:await readFile(new URL('../qa/video-audio-test.mp4',import.meta.url))})}
     if(path==='/api/today'){
       if(!['GET','HEAD'].includes(req.method))return json(res,405,{message:'Method not allowed'});
@@ -125,7 +130,7 @@ export default async function handler(req,res) {
     if(path==='/robots.txt') return send(res,200,'text/plain; charset=utf-8','User-agent: *\nDisallow: /admin\nDisallow: /api/\nSitemap: '+origin+'/sitemap.xml\n');
     if(['/','/admin','/admin/mmiliki','/admin/wakala','/gundua','/shiriki','/orodha/ombi','/akaunti','/hifadhi','/arifa'].includes(path)||/^\/habari\/[a-z0-9-]+$/.test(path)) {
       res.setHeader('Cache-Control','no-store');
-      res.setHeader('X-JAMCO-Release','bukoba-20261123-3');
+      res.setHeader('X-JAMCO-Release','bukoba-20261124-offline');
       let initial=path==='/gundua'?{category:(query.get('category')||'').slice(0,80),q:(query.get('q')||'').slice(0,100)}:{};
       if(path==='/'){initial.topic=feedTopics.some(t=>t.key===query.get('mada'))?query.get('mada'):'bukoba';initial.qa=process.env.VERCEL_ENV==='preview'&&query.get('qa')==='media';if(initial.qa)initial.feed=mediaFixture();else{
         const db=await getDb();
