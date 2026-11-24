@@ -383,7 +383,7 @@ async function detail(slug){
   $('.post-copy .post-actions',main)?.insertAdjacentHTML('beforebegin',guide.actionLinks(p,locale.locale));
  }}
 async function admin(){
- const mode=location.pathname==='/admin/wakala'?'agent':studio||location.pathname==='/admin/mmiliki'?'owner':'';
+ const mode=studio?'studio':location.pathname==='/admin/wakala'?'agent':location.pathname==='/admin/mmiliki'?'owner':'';
  const viewTools={api,esc,submit,toast};
  const logout=async()=>{await api('staff-logout');await admin();};
  const fragment=new URLSearchParams(location.hash.slice(1)).get('invite');
@@ -395,7 +395,7 @@ async function admin(){
   if(error.status!==401)throw error;
   staff=null;
  }
- if(staff&&((mode==='owner'&&staff.role!=='owner')||(mode==='agent'&&!staff.agent))){
+ if(staff&&((mode==='owner'&&staff.role!=='owner')||(mode==='studio'&&staff.agent)||(mode==='agent'&&!staff.agent))){
   main.innerHTML=intro(mode==='owner'?'Akaunti ya mmiliki':'Akaunti ya wakala','Kikao kilicho wazi kinatumia akaunti tofauti.')+`<section class="panel"><button class="primary" data-switch-account>Toka ili ubadilishe akaunti</button></section>`;
   $('[data-switch-account]').onclick=()=>logout().catch(error=>toast(error.message));return;
  }
@@ -455,8 +455,8 @@ async function admin(){
   if(adminTab==='instagram')adminTab='dashboard';
  }
  if(!tabs.some(([key])=>key===adminTab))adminTab=tabs[0]?.[0]||'';
- const tabMarkup=([key,label])=>`<button class="tab ${adminTab===key?'active':''}" data-admin-tab="${key}" aria-current="${adminTab===key?'page':'false'}">${studio&&key==='dashboard'?'Nyumbani':label}</button>`;
- main.classList.add('newsroom-workspace');main.innerHTML=`<section class="agent-profile newsroom-profile"><div class="agent-profile-avatar"><img src="/brand/icon-96.png" alt="" width="96" height="96"></div><div><p>JAMCO · CHUMBA CHA HABARI</p><h1>Chumba cha habari</h1><small>${esc(staff.email)}</small></div><a class="secondary" href="${studio?studioHome:'/'}" ${studio?'target="_blank" rel="noopener"':''}>Ona tovuti</a></section>`+`<div class="studio-work"><nav class="tabs admin-tabs" aria-label="Sehemu za usimamizi">${tabs.filter(([key])=>!studio||!secondary.has(key)).map(tabMarkup).join('')}${studio&&tabs.some(([key])=>secondary.has(key))?`<details class="studio-settings" ${secondary.has(adminTab)?'open':''}><summary>Mipangilio</summary><div>${tabs.filter(([key])=>secondary.has(key)).map(tabMarkup).join('')}</div></details>`:''}<button class="tab" data-staff-logout>Toka</button></nav><div id="admin-panel"></div></div>`;$$('[data-admin-tab]').forEach(b=>b.onclick=()=>{if($('#media-input')?.disabled||$('#quick-publisher')?.dataset.saving){toast('Subiri upakiaji ukamilike.');return;}if(adminTab===b.dataset.adminTab)return;adminTab=b.dataset.adminTab;studioRoute(adminTab);admin().catch(error=>toast(error.message));});$('[data-staff-logout]').onclick=async()=>{await api('admin-logout');admin()};await adminPanel(dash)}
+ const tabMarkup=([key,label])=>`<button class="tab ${adminTab===key?'active':''}" data-admin-tab="${key}" aria-current="${adminTab===key?'page':'false'}">${label}</button>`;
+ main.classList.add('newsroom-workspace');main.innerHTML=`<section class="agent-profile newsroom-profile"><div class="agent-profile-avatar"><img src="/brand/icon-96.png" alt="" width="96" height="96"></div><div><p>JAMCO · CHUMBA CHA HABARI</p><h1>Chumba cha habari</h1><small>${esc(staff.email)}</small></div><a class="secondary" href="${studio?studioHome:'/'}" ${studio?'target="_blank" rel="noopener"':''}>Ona tovuti</a></section>`+`<div class="studio-work">${studio?'<button class="secondary studio-menu-toggle" type="button" aria-expanded="false" aria-controls="studio-navigation">☰ Menyu ya Studio</button>':''}<nav id="studio-navigation" class="tabs admin-tabs" aria-label="Sehemu za usimamizi">${tabs.map(tabMarkup).join('')}<button class="tab" data-staff-logout>Toka</button></nav><div id="admin-panel"></div></div>`;$('.studio-menu-toggle')?.addEventListener('click',e=>{const b=e.currentTarget,open=b.getAttribute('aria-expanded')==='true';b.setAttribute('aria-expanded',String(!open));$('#studio-navigation').classList.toggle('studio-menu-open',!open);});$('[data-admin-tab]').forEach(b=>b.onclick=()=>{if($('#media-input')?.disabled||$('#quick-publisher')?.dataset.saving){toast('Subiri upakiaji ukamilike.');return;}if(adminTab===b.dataset.adminTab)return;adminTab=b.dataset.adminTab;studioRoute(adminTab);admin().catch(error=>toast(error.message));});$('[data-staff-logout]').onclick=async()=>{await api('admin-logout');admin()};await adminPanel(dash)}
 async function adminPanel(dash){const el=$('#admin-panel');
  if(adminTab==='account'){
   el.innerHTML=`<section class="panel"><h2>Akaunti ya Studio</h2><form id="studio-account" class="form"><label>Jina la kuonyesha<input name="displayName" maxlength="80" value="${esc(dash.account?.displayName||'')}"></label><label>Jina la kuingia (hiari)<input name="username" maxlength="32" autocapitalize="none" value="${esc(dash.account?.username||'')}"></label><label>Barua pepe ya kuingia<input name="email" type="email" value="${esc(dash.account?.email||'')}" required></label><label>Nenosiri la sasa<input name="currentPassword" type="password" autocomplete="current-password" required></label><label>Nenosiri jipya (hiari)<input name="newPassword" type="password" minlength="14" autocomplete="new-password"></label><button class="primary">Hifadhi akaunti</button><p class="form-status" role="status"></p></form></section>`;
@@ -714,6 +714,6 @@ window.addEventListener('jamco-language',()=>{
  if(location.pathname.startsWith('/habari/'))detail(location.pathname.split('/').pop()).catch(error=>toast(error.message));
 });
 window.addEventListener('popstate',()=>{if(studio){adminTab=new URLSearchParams(location.search).get('sehemu')||'dashboard';admin().catch(error=>toast(error.message));return;}if(location.pathname==='/'){const next=new URLSearchParams(location.search).get('mada');topic=topics.some(t=>t.key===next)?next:'bukoba';filter='';stopAutoRead();feed().catch(e=>toast(e.message))}});
-if(!studio&&'serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').then(()=>offline.warm()).catch(()=>{});
+if('serviceWorker'in navigator){if(studio&&location.hostname==='jamco-bukoba-admin.vercel.app')navigator.serviceWorker.register('/studio-sw.js',{scope:'/'}).catch(()=>{});else if(!studio)navigator.serviceWorker.register('/sw.js').then(()=>offline.warm()).catch(()=>{});}
 init();
 })();

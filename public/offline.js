@@ -20,12 +20,12 @@
   const state=document.querySelector('#jamco-offline-state');
   if(state){
    state.hidden=!isOffline();
-   state.textContent=lang('Huna intaneti kwa sasa. Unaona yaliyohifadhiwa kwenye kifaa hiki.','You’re offline. You can read and play what’s saved on this device.');
+   state.textContent=document.documentElement.dataset.studio==='true'?lang('Studio inahitaji intaneti. Unganisha tena ili kuendelea.','Studio requires an internet connection. Reconnect to continue.'):lang('Huna intaneti kwa sasa. Unaona yaliyohifadhiwa kwenye kifaa hiki.','You’re offline. You can read and play what’s saved on this device.');
   }
   const install=document.querySelector('#jamco-install');
   if(install){
-   install.hidden=document.documentElement.dataset.studio==='true'||isOffline()||standalone()||!('serviceWorker'in navigator);
-   install.textContent=lang('Sakinisha JAMCO','Install JAMCO');
+   install.hidden=isOffline()||standalone()||!('serviceWorker'in navigator);
+   install.textContent=document.documentElement.dataset.studio==='true'?lang('Sakinisha JAMCO Studio','Install JAMCO Studio'):lang('Sakinisha JAMCO','Install JAMCO');
   }
   document.documentElement.dataset.offline=String(isOffline());
  }
@@ -256,7 +256,7 @@
    }
    const dialog=document.querySelector('#jamco-install-help');
    if(!dialog)return;
-   dialog.querySelector('h2').textContent=lang('Sakinisha JAMCO','Install JAMCO');
+   dialog.querySelector('h2').textContent=document.documentElement.dataset.studio==='true'?lang('Sakinisha JAMCO Studio','Install JAMCO Studio'):lang('Sakinisha JAMCO','Install JAMCO');
    dialog.querySelector('p').textContent=lang('Kwenye iPhone, fungua Safari, bonyeza Shiriki, kisha Ongeza kwenye Skrini ya Mwanzo. Kwenye Android au kompyuta, fungua menyu ya kivinjari kisha chagua Sakinisha programu au Ongeza kwenye skrini ya mwanzo.','On iPhone, open Safari and choose Share, then Add to Home Screen. On Android or desktop, open the browser menu and choose Install app or Add to Home Screen.');
    if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');
    dialog.querySelector('button').onclick=()=>{if(dialog.close)dialog.close();else dialog.removeAttribute('open');};

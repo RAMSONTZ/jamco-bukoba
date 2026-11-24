@@ -91,7 +91,7 @@ export default async function handler(req,res) {
   security(res);
   const parsed = new URL(req.url,'http://internal');
   const host=(req.headers.host||'').toLowerCase();
-  const adminOnly=host.split(':')[0]===adminHost;
+  const adminOnly=host.split(':')[0]===adminHost||(process.env.VERCEL_ENV==='preview'&&parsed.searchParams.get('studio-preview')==='1');
   const requestedPath = (parsed.pathname==='/api/site' && typeof req.query?.__path==='string' ? req.query.__path : parsed.pathname).replace(/\/$/,'') || '/';
   const path=adminOnly&&requestedPath==='/'?'/admin/mmiliki':requestedPath;
   const query=parsed.searchParams;
