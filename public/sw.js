@@ -178,7 +178,9 @@ async function pinPictures(values){
  await Promise.allSettled([...urls].map(async url=>{
   if(await pinned.match(url))return;
   const response=await source.match(url)||await fetch(url,{credentials:'omit'});
-  if(publicMedia(response)&&response.headers.get('Content-Type')?.startsWith('image/'))await pinned.put(url,response);
+  const upload=mediaPath.test(new URL(url).pathname);
+  const cacheable=upload?publicMedia(response):response.status===200&&!/no-store|private/i.test(response.headers.get('Cache-Control')||'');
+  if(cacheable&&response.headers.get('Content-Type')?.startsWith('image/'))await pinned.put(url,response);
  }));
  await Promise.all((await pinned.keys()).filter(key=>!urls.has(key.url)).map(key=>pinned.delete(key)));
 }
