@@ -273,7 +273,7 @@ test('dedicated studio uses existing staff authorization and stages the login co
  assert.equal(root.headers.get('x-robots-tag'),'noindex, nofollow');
  const html=await root.text();
  assert.match(html,/data-studio="true"/);
- assert.doesNotMatch(html,/"feed":|rel="manifest"/);
+ assert.doesNotMatch(html,/"feed":/);assert.match(html,/href="\/studio.webmanifest"/);
  const publicRoute=await fetch(host+'/gundua',{headers:studioHeaders,redirect:'manual'});
  assert.equal(publicRoute.headers.get('location'),'https://jamco-bukoba.vercel.app/gundua');
  assert.equal((await post('social/admin-dashboard',{},null,studioHeaders)).status,401);
@@ -303,4 +303,11 @@ test('studio owner can change credentials and published audio has a scannable QR
  assert.equal(staff.data.email,credentials.email);
  assert.equal(staff.data.displayName,credentials.displayName);
  assert.equal((await api('staff-login',{email:credentials.username,password:credentials.newPassword,mode:'owner'})).data.code,'staff_code_required');
+});
+
+test('public media library counts individual assets, excludes drafts, and paginates',async()=>{
+ const db=await getDb();const item={title:'Library test',media:[{type:'image',url:'/brand/icon-192.png'},{type:'video',url:'/brand/test.mp4'}]};
+ for(const [s,state,live] of [['library-test-published','published','2001-01-01'],['library-test-draft','draft','2001-01-01'],['library-test-future','published','2050-01-01']])await db.query('INSERT INTO jamco_content(slug,kind,state,live_at,data) VALUES($1,$2,$3,$4,$5)',[s,'story',state,live,JSON.stringify(item)]);
+ const page=await fetch(host+'/api/library?year=2001&limit=1').then(r=>r.json());assert.equal(page.items.length,1);assert.equal(page.items[0].slug,'library-test-published');assert.ok(page.next);const next=await fetch(host+'/api/library?year=2001&limit=1&cursor='+encodeURIComponent(page.next)).then(r=>r.json());assert.equal(next.items.length,1);assert.notEqual(next.items[0].type,page.items[0].type);assert.equal(next.next,null);assert.equal(page.images,next.images);assert.equal(page.videos,next.videos);assert.ok(page.years.includes(2001));
+ await db.query("DELETE FROM jamco_content WHERE slug LIKE 'library-test-%'");
 });

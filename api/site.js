@@ -4,6 +4,7 @@ import {mediaFixture} from '../qa/feed-fixture.js';
 import {feedTopics} from '../public/feed-topics.js';
 import {transformImage} from '../lib/media.js';
 import {publicFeed,clearPublicFeed} from '../lib/public-feed.js';
+import {mediaLibrary} from '../lib/media-library.js';
 import {social} from '../lib/social.js';
 import {today} from '../lib/bukoba-today.js';
 import {socialShell} from '../lib/social-pages.js';
@@ -124,6 +125,10 @@ export default async function handler(req,res) {
       const result=await today(await getDb());
       res.setHeader('Cache-Control','public, max-age=0, s-maxage=15');
       return send(res,200,'application/json; charset=utf-8',JSON.stringify(result));
+    }
+    if(path==='/api/library'){
+      if(!['GET','HEAD'].includes(req.method))return json(res,405,{message:'Method not allowed'});
+      return json(res,200,await mediaLibrary(await getDb(),Object.fromEntries(query)));
     }
     if(path==='/api/feed'){
       if(!['GET','HEAD'].includes(req.method))return json(res,405,{message:'Method not allowed'});
