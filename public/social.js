@@ -390,6 +390,7 @@ async function detail(slug){
   $('.post-copy .post-actions',main)?.insertAdjacentHTML('beforebegin',guide.actionLinks(p,locale.locale));
  }}
 async function admin(){
+ document.documentElement.classList.remove('studio-scroll-lock');
  const mode=location.pathname==='/admin/wakala'?'agent':studio?'studio':location.pathname==='/admin/mmiliki'?'owner':'';
  const viewTools={api,esc,submit,toast};
  const logout=async()=>{await api('staff-logout');await admin();};
@@ -407,9 +408,10 @@ async function admin(){
   $('[data-switch-account]').onclick=()=>logout().catch(error=>toast(error.message));return;
  }
  if(!staff){
+  document.documentElement.classList.remove('studio-authenticated');main.classList.remove('newsroom-workspace');
   const setup=mode!=='agent'&&new URLSearchParams(location.search).has('setup');
   main.innerHTML=`<section class="panel studio-login">
-   <h1>${setup?'Sanidi mmiliki':mode==='agent'?'Ingia kama wakala':'Ingia JAMCO Studio'}</h1>
+   <div class="studio-login-brand"><img src="/brand/studio-192.png" width="52" height="52" alt=""><span>JAMCO Studio<small>BUKOBA · NEWSROOM</small></span></div><p class="studio-kicker">SEHEMU BINAFSI YA USIMAMIZI</p><h1>${setup?'Sanidi mmiliki':mode==='agent'?'Ingia kama wakala':'Ingia JAMCO Studio'}</h1>
    <form class="form" id="staff-login">
     ${setup?'<label>Ufunguo wa usanidi<input name="key" type="password" autocomplete="off" required></label>':''}
     <div data-password-fields><label>${setup?'Barua pepe':'Barua pepe au jina la kuingia'}<input name="email" type="${setup?'email':'text'}" autocapitalize="none" autocomplete="username" required></label>
@@ -451,6 +453,7 @@ async function admin(){
 
  if(!staff.mfa){main.innerHTML=intro('Linda akaunti yako.','MFA inahitajika kwa kila msimamizi.')+`<section class="panel"><h2>Sanidi programu ya uthibitisho</h2><p>Tumia programu ya TOTP. Hifadhi ufunguo kwa usalama kabla ya kuthibitisha.</p><button class="secondary" data-mfa-start>Onyesha ufunguo wa MFA</button><div id="mfa-setup"></div></section>`;$('[data-mfa-start]').onclick=async()=>{try{const d=await api('mfa-start');$('#mfa-setup').innerHTML=`<p class="copy-secret">${esc(d.secret)}</p><p><a href="${esc(d.uri)}" class="text-button">Fungua programu ya uthibitisho</a></p><form class="form" id="mfa-form"><label>Msimbo wa tarakimu 6<input name="code" inputmode="numeric" pattern="[0-9]{6}" required></label><button class="primary">Thibitisha MFA</button><p class="form-status" role="status"></p></form>`;$('#mfa-form').onsubmit=e=>{e.preventDefault();submit(e.currentTarget,async d=>{const r=await api('mfa-confirm',d);await admin();return r})}}catch(e){toast(e.message)}};return}
  if(staff.agent){
+  document.documentElement.classList.remove('studio-authenticated');main.classList.remove('newsroom-workspace');
   const ui=await import('/staff-space.js?v=1');await ui.agentView(main,viewTools,staff,logout);return;
  }
  let dash;try{dash=await api('admin-dashboard')}catch{dash={grants:[],role:staff.role};for(const p of ['publish','moderate','members','premium']){try{await api(({publish:'admin-posts',moderate:'admin-queue',members:'admin-members',premium:'admin-memberships'})[p]);dash.grants.push(p)}catch{}}}adminGrants=dash.grants;dash.account=staff;
@@ -462,20 +465,27 @@ async function admin(){
   if(adminTab==='instagram')adminTab='dashboard';
  }
  if(!tabs.some(([key])=>key===adminTab))adminTab=tabs[0]?.[0]||'';
- const tabMarkup=([key,label])=>`<button class="tab ${adminTab===key?'active':''}" data-admin-tab="${key}" aria-current="${adminTab===key?'page':'false'}">${label}</button>`;
- main.classList.add('newsroom-workspace');main.innerHTML=`<section class="agent-profile newsroom-profile"><div class="agent-profile-avatar"><img src="/brand/icon-96.png" alt="" width="96" height="96"></div><div><p>JAMCO · CHUMBA CHA HABARI</p><h1>JAMCO Studio</h1><small>${esc(staff.email)}</small></div><a class="secondary" href="${studio?studioHome:'/'}" ${studio?'target="_blank" rel="noopener"':''}>Ona tovuti</a></section>`+`<div class="studio-work">${studio?'<button class="secondary studio-menu-toggle" type="button" aria-expanded="false" aria-controls="studio-navigation">☰ Menyu ya Studio</button>':''}<nav id="studio-navigation" class="tabs admin-tabs" aria-label="Sehemu za usimamizi">${tabs.map(tabMarkup).join('')}<button class="tab" data-staff-logout>Toka</button></nav><div id="admin-panel"></div></div>`;$('.studio-menu-toggle')?.addEventListener('click',e=>{const b=e.currentTarget,open=b.getAttribute('aria-expanded')==='true';b.setAttribute('aria-expanded',String(!open));$('#studio-navigation').classList.toggle('studio-menu-open',!open);});$$('[data-admin-tab]').forEach(b=>b.onclick=()=>{if($('#media-input')?.disabled||Number($('#media-input')?.form?.dataset.mediaPending)||$('#quick-publisher')?.dataset.saving||$('#publisher-form')?.dataset.saving){toast('Subiri upakiaji ukamilike.');return;}if(adminTab===b.dataset.adminTab)return;adminTab=b.dataset.adminTab;studioRoute(adminTab);admin().catch(error=>toast(error.message));});$('[data-staff-logout]').onclick=async()=>{await api('admin-logout');admin()};await adminPanel(dash)}
+ const ui=await import('/studio-shell.js?v=1');
+ document.documentElement.classList.add('studio-authenticated');document.documentElement.classList.remove('studio-scroll-lock');
+ main.classList.add('newsroom-workspace');main.innerHTML=ui.shellMarkup(tabs,adminTab,staff,{publicUrl:studioHome});
+ const closeDrawer=ui.bindDrawer(main);
+ $$('[data-admin-tab]',main).forEach(button=>button.onclick=()=>{if($('#media-input')?.disabled||Number($('#media-input')?.form?.dataset.mediaPending)||$('#quick-publisher')?.dataset.saving||$('#publisher-form')?.dataset.saving){toast('Subiri upakiaji ukamilike.');return;}closeDrawer();if(adminTab===button.dataset.adminTab)return;adminTab=button.dataset.adminTab;studioRoute(adminTab);admin().catch(error=>toast(error.message));});
+ $('[data-staff-logout]',main).onclick=async()=>{if($('#media-input')?.disabled||Number($('#media-input')?.form?.dataset.mediaPending)||$('#quick-publisher')?.dataset.saving||$('#publisher-form')?.dataset.saving){toast('Subiri upakiaji ukamilike.');return;}closeDrawer();await api('admin-logout');admin()};
+ const panel=$('#admin-panel');try{await adminPanel(dash)}finally{panel.setAttribute('aria-busy','false')}
+}
+
 async function adminPanel(dash){const el=$('#admin-panel');
- if(adminTab==='audit'){const m=await import('/studio-dashboard.js?v=1');await m.auditPanel(el,api);return;}
- if(adminTab==='ads'){const m=await import('/studio-dashboard.js?v=1');await m.adsPanel(el,api,post=>{currentEdit=post;listingDraft=post?null:{contentType:'Business Promotions',category:'Matangazo'};adminTab='publish';studioRoute(adminTab);admin();});return;}
+ if(adminTab==='audit'){const m=await import('/studio-dashboard.js?v=2');await m.auditPanel(el,api);return;}
+ if(adminTab==='ads'){const m=await import('/studio-dashboard.js?v=2');await m.adsPanel(el,api,post=>{currentEdit=post;listingDraft=post?null:{contentType:'Business Promotions',category:'Matangazo'};adminTab='publish';studioRoute(adminTab);admin();});return;}
  if(adminTab==='account'){
   el.innerHTML=`<section class="panel"><h2>Akaunti ya Studio</h2><form id="studio-account" class="form"><label>Jina la kuonyesha<input name="displayName" maxlength="80" value="${esc(dash.account?.displayName||'')}"></label><label>Jina la kuingia (hiari)<input name="username" maxlength="32" autocapitalize="none" value="${esc(dash.account?.username||'')}"></label><label>Barua pepe ya kuingia<input name="email" type="email" value="${esc(dash.account?.email||'')}" required></label><label>Nenosiri la sasa<input name="currentPassword" type="password" autocomplete="current-password" required></label><label>Nenosiri jipya (hiari)<input name="newPassword" type="password" minlength="14" autocomplete="new-password"></label><button class="primary">Hifadhi akaunti</button><p class="form-status" role="status"></p></form></section>`;
   if(!dash.account){const staff=await api('staff-me');$('#studio-account').elements.email.value=staff.email;$('#studio-account').elements.displayName.value=staff.displayName||'';}
   $('#studio-account').onsubmit=e=>{e.preventDefault();submit(e.currentTarget,async data=>{const r=await api('staff-account',data);await admin();toast(r.message);return r;});};
-  const security=await import('/studio-dashboard.js?v=1');await security.securityPanel(el,api,dash.account,toast);
+  const security=await import('/studio-dashboard.js?v=2');await security.securityPanel(el,api,dash.account,toast);
   return;
  }
-if(adminTab==='dashboard'){const labels={members:'Wanachama',signed_in_members:'Wanachama wenye vipindi hai',new_members:'Waliojiunga siku 7',published:'Maudhui yaliyochapishwa',likes:'Kupendwa',comments:'Maoni',submissions:'Taarifa zinazosubiri',reports:'Ripoti zinazosubiri',premium:'Maombi ya Premium',video_views:'Watazamaji wa video / siku'};el.innerHTML=`<section class="panel">${dash.grants?.includes('publish')?`<div class="newsroom-quick"><button type="button" class="primary" data-new-compose>Chapisho jipya</button><button type="button" class="secondary" data-quick-editor="notice">Tangazo muhimu la leo</button><button type="button" class="secondary" data-quick-editor="funeral">Ratiba ya msiba</button></div>`:''}<div class="stats">${Object.entries(dash.stats||{}).map(([k,v])=>`<div class="stat"><strong>${v}</strong><small>${labels[k]||k}</small></div>`).join('')}</div><p class="fineprint">Vipindi hai si kipimo cha watumiaji walio mtandaoni sasa. Video huhesabiwa baada ya sekunde 2 za kucheza kwa mwanachama aliyethibitishwa, kwa siku.</p></section>${dash.locations?.length?`<section class="panel"><h2>Maeneo ya wanachama</h2><ul class="studio-locations">${dash.locations.map(row=>`<li><span>${esc(row.location)}</span><strong>${row.members}</strong></li>`).join('')}</ul></section>`:''}<section class="panel"><h2>Kumbukumbu za usimamizi</h2>${(dash.audit||[]).map(x=>`<div class="list-item"><strong>${esc(x.action)}</strong><p>${esc(x.subject)}</p><small>${esc(x.actor)} · ${esc(time(x.happened_at))}</small></div>`).join('')}</section>`;
-  const metrics=await import('/studio-dashboard.js?v=1');await metrics.dashboardPanel(el,api);
+if(adminTab==='dashboard'){
+  const metrics=await import('/studio-dashboard.js?v=2');await metrics.overview(el,dash,api);
   $('[data-new-compose]',el)?.addEventListener('click',()=>{listingDraft=null;currentEdit=null;adminTab='compose';studioRoute(adminTab);admin();});
   $$('[data-quick-editor]',el).forEach(button=>button.onclick=()=>{
    const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Africa/Dar_es_Salaam'}).format(new Date());
