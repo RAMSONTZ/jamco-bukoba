@@ -33,7 +33,7 @@ async function sendBinary(req,res,file){
  end=Math.min(end,start+2_499_999);
  status=206;res.setHeader('Content-Range',`bytes ${start}-${end}/${size}`)}
  if(status===200&&req.method==='GET'&&size>3_000_000){
-   res.statusCode=200;res.setHeader('Content-Type',file.mime);res.flushHeaders?.();
+   res.statusCode=200;res.setHeader('Content-Type',file.mime);res.setHeader('Content-Length',size);res.flushHeaders?.();
    for(let i=0;i<size&&!res.destroyed;i+=1_000_000){
      const part=await read(i,Math.min(1_000_000,size-i));
      if(!res.write(part)) await new Promise(resolve=>{
@@ -67,7 +67,7 @@ async function input(req) {
 }
 
 const adminHost='jamco-bukoba-admin.vercel.app';
-const studioPages=new Set(['/admin','/admin/mmiliki']);
+const studioPages=new Set(['/admin','/admin/mmiliki','/admin/wakala']);
 
 const redirects = {
   '/updates':'/habari','/news':'/habari','/events':'/matukio','/gallery':'/picha','/video':'/tv',
@@ -99,7 +99,7 @@ export default async function handler(req,res) {
   if(adminOnly)res.setHeader('X-Robots-Tag','noindex, nofollow');
   if(['/admin','/admin/mmiliki'].includes(path))res.setHeader('Permissions-Policy','camera=(), microphone=(self), geolocation=()');
   try {
-    if(process.env.VERCEL&&host==='jamco-bukoba.vercel.app'&&['GET','HEAD'].includes(req.method)&&studioPages.has(path)){res.setHeader('Location','https://'+adminHost+'/'+parsed.search);return send(res,307,'text/plain','Moved');}
+    if(process.env.VERCEL&&host==='jamco-bukoba.vercel.app'&&['GET','HEAD'].includes(req.method)&&studioPages.has(path)){res.setHeader('Location','https://'+adminHost+(path==='/admin/wakala'?path:'/')+parsed.search);return send(res,307,'text/plain','Moved');}
     if(adminOnly&&['GET','HEAD'].includes(req.method)&&!studioPages.has(path)&&!path.startsWith('/api/')&&!path.startsWith('/media/')){
       if(path==='/robots.txt')return send(res,200,'text/plain; charset=utf-8','User-agent: *\nDisallow: /\n');
       if(path==='/offline-shell')return send(res,404,'text/plain','Not found');
@@ -135,11 +135,12 @@ export default async function handler(req,res) {
       if(!['GET','HEAD'].includes(req.method))return json(res,405,{message:'Method not allowed'});
       const data=Object.fromEntries(query);delete data.__path;
       const result=await publicFeed(await getDb(),req,res,data);
-      res.setHeader('Cache-Control','public, max-age=0, s-maxage=10, stale-while-revalidate=20');
+      res.setHeader('Cache-Control','public, max-age=0, s-maxage=2, must-revalidate');
       res.setHeader('Vary','Accept-Encoding');
       return send(res,200,'application/json; charset=utf-8',JSON.stringify(result));
     }
     if(path.startsWith('/api/')) {
+      if(process.env.VERCEL&&host==='jamco-bukoba.vercel.app'&&(/^\/api\/manage\//.test(path)||/^\/api\/social\/(?:admin-|staff-|studio-|mfa-|upload-part|agent-)/.test(path)))return json(res,403,{message:'Tumia JAMCO Studio kwa usimamizi.'});
       const method=path==='/api/push-config'?'GET':'POST';
       if(req.method!==method) return json(res,405,{message:'Njia hii haikubaliki.'});
       if(method==='POST' && req.headers['sec-fetch-site'] && !['same-origin','none'].includes(req.headers['sec-fetch-site'])) return json(res,403,{message:'Ombi halikuruhusiwa.'});
@@ -159,12 +160,12 @@ export default async function handler(req,res) {
     if(path==='/robots.txt') return send(res,200,'text/plain; charset=utf-8','User-agent: *\nDisallow: /admin\nDisallow: /api/\nSitemap: '+origin+'/sitemap.xml\n');
     if(['/','/admin','/admin/mmiliki','/admin/wakala','/gundua','/shiriki','/orodha/ombi','/akaunti','/hifadhi','/arifa'].includes(path)||/^\/habari\/[a-z0-9-]+$/.test(path)) {
       res.setHeader('Cache-Control','no-store');
-      res.setHeader('X-JAMCO-Release','bukoba-20261124-fast');
+      res.setHeader('X-JAMCO-Release','jamco-20261124-media-v2');
       let initial=path==='/gundua'?{category:(query.get('category')||'').slice(0,80),q:(query.get('q')||'').slice(0,100)}:adminOnly?{adminOnly:true}:{};
       if(path==='/'){initial.topic=feedTopics.some(t=>t.key===query.get('mada'))?query.get('mada'):'bukoba';initial.qa=process.env.VERCEL_ENV==='preview'&&query.get('qa')==='media';if(initial.qa)initial.feed=mediaFixture();else{
         const db=await getDb();
         [initial.feed,initial.today]=await Promise.all([publicFeed(db,req,res,{limit:8,topic:initial.topic}),today(db)]);
-      }res.setHeader('Cache-Control',initial.qa?'no-store':'public, max-age=0, s-maxage=10, stale-while-revalidate=20');}
+      }res.setHeader('Cache-Control',initial.qa?'no-store':'public, max-age=0, s-maxage=2, must-revalidate');}
       if(path.startsWith('/habari/')){
         const slug=path.slice(8);
         const result=await publicFeed(await getDb(),req,res,{slug,limit:1});

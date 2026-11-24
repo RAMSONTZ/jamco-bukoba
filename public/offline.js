@@ -245,7 +245,7 @@
  });
  document.addEventListener('DOMContentLoaded',()=>{
   update();
-  predict();
+  if(document.documentElement.dataset.studio!=='true')predict();
   new MutationObserver(cleanupMedia).observe(document.body,{childList:true,subtree:true});
   document.querySelector('#jamco-install')?.addEventListener('click',async()=>{
    if(installEvent){

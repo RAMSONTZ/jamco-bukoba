@@ -64,3 +64,5 @@
 .record-wave{width:100%;height:64px;background:var(--raised);border:1px solid var(--line);border-radius:8px}.record-review{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.record-review audio{width:100%}.record-review:empty{display:none}
 
 .studio-video-preview{width:100%;max-height:40vh;background:#111;display:block}.checksum{overflow-wrap:anywhere;font-family:monospace;font-size:.75rem}
+
+#upload-progress{display:block;width:100%;height:14px;accent-color:var(--accent);margin:8px 0}#upload-progress[hidden]{display:none}#upload-status{overflow-wrap:anywhere;min-height:1.25em}.media-previews video{object-fit:contain;max-height:260px;background:#111}.media-previews figure{min-width:0}
