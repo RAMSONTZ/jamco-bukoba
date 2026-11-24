@@ -64,6 +64,9 @@ async function input(req) {
   return result;
 }
 
+const adminHost='jamco-bukoba-admin.vercel.app';
+const studioPages=new Set(['/admin','/admin/mmiliki']);
+
 const redirects = {
   '/updates':'/habari','/news':'/habari','/events':'/matukio','/gallery':'/picha','/video':'/tv',
   '/business':'/biashara','/contact':'/wasiliana','/saved':'/hifadhi',
@@ -86,10 +89,20 @@ function security(res) {
 export default async function handler(req,res) {
   security(res);
   const parsed = new URL(req.url,'http://internal');
-  const path = (parsed.pathname==='/api/site' && typeof req.query?.__path==='string' ? req.query.__path : parsed.pathname).replace(/\/$/,'') || '/';
+  const host=(req.headers.host||'').toLowerCase();
+  const adminOnly=host.split(':')[0]===adminHost;
+  const requestedPath = (parsed.pathname==='/api/site' && typeof req.query?.__path==='string' ? req.query.__path : parsed.pathname).replace(/\/$/,'') || '/';
+  const path=adminOnly&&requestedPath==='/'?'/admin/mmiliki':requestedPath;
   const query=parsed.searchParams;
+  if(adminOnly)res.setHeader('X-Robots-Tag','noindex, nofollow');
   if(['/admin','/admin/mmiliki'].includes(path))res.setHeader('Permissions-Policy','camera=(), microphone=(self), geolocation=()');
   try {
+    if(adminOnly&&['GET','HEAD'].includes(req.method)&&!studioPages.has(path)&&!path.startsWith('/api/')&&!path.startsWith('/media/')){
+      if(path==='/robots.txt')return send(res,200,'text/plain; charset=utf-8','User-agent: *\nDisallow: /\n');
+      if(path==='/offline-shell')return send(res,404,'text/plain','Not found');
+      res.setHeader('Location',origin+(path.startsWith('//')?'/':path));
+      return send(res,307,'text/plain','Moved');
+    }
     if(path==='/offline-shell'&&['GET','HEAD'].includes(req.method)){
       res.setHeader('Cache-Control','no-store');
       res.setHeader('X-Robots-Tag','noindex');
@@ -114,7 +127,7 @@ export default async function handler(req,res) {
       const method=path==='/api/push-config'?'GET':'POST';
       if(req.method!==method) return json(res,405,{message:'Njia hii haikubaliki.'});
       if(method==='POST' && req.headers['sec-fetch-site'] && !['same-origin','none'].includes(req.headers['sec-fetch-site'])) return json(res,403,{message:'Ombi halikuruhusiwa.'});
-      if(method==='POST' && req.headers.origin && !["https://jamco-bukoba.vercel.app",'https://'+req.headers.host,...(!process.env.VERCEL?['http://'+req.headers.host]:[])].includes(req.headers.origin)) return json(res,403,{message:'Ombi halikuruhusiwa.'});
+      if(method==='POST' && req.headers.origin && !['https://'+host,...(!adminOnly?[origin]:[]),...(!process.env.VERCEL?['http://'+host]:[])].includes(req.headers.origin)) return json(res,403,{message:'Ombi halikuruhusiwa.'});
       const db=await getDb();
       const data=method==='POST'?await input(req):{};
       const manage=path.startsWith('/api/manage/');
@@ -130,8 +143,8 @@ export default async function handler(req,res) {
     if(path==='/robots.txt') return send(res,200,'text/plain; charset=utf-8','User-agent: *\nDisallow: /admin\nDisallow: /api/\nSitemap: '+origin+'/sitemap.xml\n');
     if(['/','/admin','/admin/mmiliki','/admin/wakala','/gundua','/shiriki','/orodha/ombi','/akaunti','/hifadhi','/arifa'].includes(path)||/^\/habari\/[a-z0-9-]+$/.test(path)) {
       res.setHeader('Cache-Control','no-store');
-      res.setHeader('X-JAMCO-Release','bukoba-20261124-newsroom');
-      let initial=path==='/gundua'?{category:(query.get('category')||'').slice(0,80),q:(query.get('q')||'').slice(0,100)}:{};
+      res.setHeader('X-JAMCO-Release','bukoba-20261124-studio');
+      let initial=path==='/gundua'?{category:(query.get('category')||'').slice(0,80),q:(query.get('q')||'').slice(0,100)}:adminOnly?{adminOnly:true}:{};
       if(path==='/'){initial.topic=feedTopics.some(t=>t.key===query.get('mada'))?query.get('mada'):'bukoba';initial.qa=process.env.VERCEL_ENV==='preview'&&query.get('qa')==='media';if(initial.qa)initial.feed=mediaFixture();else{
         const db=await getDb();
         [initial.feed,initial.today]=await Promise.all([publicFeed(db,req,res,{limit:8,topic:initial.topic}),today(db)]);
@@ -166,7 +179,7 @@ export default async function handler(req,res) {
   } catch(error) {
     if(res.headersSent){res.destroy(error);return;}
     if(!(error instanceof ApiError)) console.error('Jamco request failed',error.code||error.name,String(error.message).slice(0,200));
-    if(path.startsWith('/api/')) return json(res,error.status||503,{message:error.status?error.message:'Huduma haipatikani kwa sasa. Jaribu tena baadaye.'});
+    if(path.startsWith('/api/')) return json(res,error.status||503,{message:error.status?error.message:'Huduma haipatikani kwa sasa. Jaribu tena baadaye.',...(error.code==='staff_code_required'?{code:error.code}:{})});
     res.setHeader('Cache-Control','no-store');
     return send(res,503,'text/html; charset=utf-8',htmlShell({path,title:'Huduma inasubiri',description:'JAMCO Bukoba',noindex:true,content:'<section class="plain-card"><h1>Huduma haipatikani kwa sasa</h1><a href="/">Jaribu tena ↗</a></section>'}));
   }

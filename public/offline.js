@@ -24,7 +24,7 @@
   }
   const install=document.querySelector('#jamco-install');
   if(install){
-   install.hidden=isOffline()||standalone()||!('serviceWorker'in navigator);
+   install.hidden=document.documentElement.dataset.studio==='true'||isOffline()||standalone()||!('serviceWorker'in navigator);
    install.textContent=lang('Sakinisha JAMCO','Install JAMCO');
   }
   document.documentElement.dataset.offline=String(isOffline());

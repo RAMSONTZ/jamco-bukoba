@@ -24,6 +24,9 @@ const main=$('#main'),sheet=$('#sheet'),viewer=$('#viewer');
 for(const dialog of [sheet,viewer])if(!dialog.close)dialog.close=()=>{dialog.removeAttribute('open');dialog.dispatchEvent(new Event('close'));};let user=null,saved=new Set(),posts=new Map(),offset=0,more=false,filter='',request=0,adminTab='dashboard',adminGrants=[],mediaFiles=[],currentEdit=null,listingDraft=null,viewerScale=1,feedTimer,commentTimer;
 let liked=new Set(),initialData={};try{initialData=JSON.parse($('#initial')?.textContent||'{}')}catch{}const publicReads=new Map(),offline=window.JamcoOffline;
 if(initialData.offline)offline.setDegraded(true);
+const studio=initialData.adminOnly===true;
+const studioHome='https://jamco-bukoba.vercel.app/';
+if(studio)adminTab='compose';
 const topics=initialData.topics||[{key:'bukoba',label:'Bukoba',icon:'compass'}];let viewerCurrent=null;let topic=initialData.topic||'bukoba',autoRead=false,autoTimer,readInterval=15000,autoSlides=false,slideTimer;
 const thumb=url=>/^\/media\/[a-f0-9-]{36}$/.test(url||'')?url+'?w=96&format=webp':url;
 
@@ -47,7 +50,7 @@ async function api(action,data={}){
    if(response.status>=500){const error=offline.offlineError();error.status=response.status;throw error;}
    offline.setDegraded(false);
    const body=await response.json();
-   if(!response.ok){const error=Error(body.message||'Ombi halikufanikiwa.');error.status=response.status;throw error;}
+   if(!response.ok){const error=Error(body.message||'Ombi halikufanikiwa.');error.status=response.status;error.code=body.code;throw error;}
    if(cacheable&&!initialData.qa)await offline.write(action,data,body,owner);
    if(!cacheable&&action!=='me')publicReads.clear();
    return body;
@@ -84,7 +87,7 @@ function imageTag(m,alt,eager=false,thumbnail=false,deferred=false){
  return avif?`<picture><source type="image/avif" ${sourceAttr}="${esc(avif)}" sizes="(max-width: 760px) 100vw, 620px">${img}</picture>`:img;
 }
 
-function drawNav(){for(const n of ['#desktop-nav','#dock'])$(n).innerHTML=nav.map(([href,label,i])=>`<a class="nav-item ${location.pathname===href?'active':''}" href="${href}" ${location.pathname===href?'aria-current="page"':''}>${icon(i)}<span ${labels(label)}>${esc(t(label))}</span></a>`).join('');$$('[data-icon]').forEach(x=>x.innerHTML=icon(x.dataset.icon));if(user){const a=$('.account-link');if(a)a.innerHTML=user.avatar?`<img src="${esc(user.avatar)}" alt="">`:esc(user.display_name[0])}const compose=$('.compose-avatar img');if(compose)compose.src=user?.avatar?thumb(user.avatar):'/brand/icon-96.png'}
+function drawNav(){if(studio)return;for(const n of ['#desktop-nav','#dock'])$(n).innerHTML=nav.map(([href,label,i])=>`<a class="nav-item ${location.pathname===href?'active':''}" href="${href}" ${location.pathname===href?'aria-current="page"':''}>${icon(i)}<span ${labels(label)}>${esc(t(label))}</span></a>`).join('');$$('[data-icon]').forEach(x=>x.innerHTML=icon(x.dataset.icon));if(user){const a=$('.account-link');if(a)a.innerHTML=user.avatar?`<img src="${esc(user.avatar)}" alt="">`:esc(user.display_name[0])}const compose=$('.compose-avatar img');if(compose)compose.src=user?.avatar?thumb(user.avatar):'/brand/icon-96.png'}
 function intro(title,description='',eye='JAMCO BUKOBA'){return `<header class="intro"><div class="eyebrow">${esc(eye)}</div><h1>${esc(title)}</h1>${description?`<p>${esc(description)}</p>`:''}</header>`}
 function empty(title,body,i='compass'){return `<div class="empty">${icon(i)}<h2>${esc(title)}</h2><p>${esc(body)}</p></div>`}
 function needLogin(verified=true){if(!user){openSheet(tr('Jiunge na mazungumzo','Join the conversation'),`<p>${tr('Ingia ili kutoa maoni.','Sign in to comment.')}</p><a class="primary" href="/akaunti">${tr('Ingia au fungua akaunti','Sign in or create an account')}</a>`);return false}if(verified&&!user.verified){toast('Thibitisha barua pepe yako kupitia Akaunti.');return false}return true}
@@ -270,7 +273,7 @@ function listingRequest(){
  })};
 }
 async function uploadFile(file){
- if(['/admin','/admin/mmiliki'].includes(location.pathname))return window.JamcoMedia.upload(file,api,percent=>{$('#upload-status').textContent=`Inapakia ${file.name}: ${percent}%`;});
+ if(studio||['/admin','/admin/mmiliki'].includes(location.pathname))return window.JamcoMedia.upload(file,api,percent=>{$('#upload-status').textContent=`Inapakia ${file.name}: ${percent}%`;});
  if(file.type&&!file.type.startsWith('image/'))throw Error('Chagua picha ya wasifu.');
  const image=await createImageBitmap(file),canvas=document.createElement('canvas'),scale=Math.min(1,512/Math.max(image.width,image.height));
  canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));
@@ -368,7 +371,7 @@ async function detail(slug){
   $('.post-copy .post-actions',main)?.insertAdjacentHTML('beforebegin',guide.actionLinks(p,locale.locale));
  }}
 async function admin(){
- const mode=location.pathname==='/admin/mmiliki'?'owner':location.pathname==='/admin/wakala'?'agent':'';
+ const mode=location.pathname==='/admin/wakala'?'agent':studio||location.pathname==='/admin/mmiliki'?'owner':'';
  const viewTools={api,esc,submit,toast};
  const logout=async()=>{await api('staff-logout');await admin();};
  const fragment=new URLSearchParams(location.hash.slice(1)).get('invite');
@@ -385,13 +388,56 @@ async function admin(){
   $('[data-switch-account]').onclick=()=>logout().catch(error=>toast(error.message));return;
  }
  if(!staff){
-  const setup=mode!=='agent'&&new URLSearchParams(location.search).has('setup');main.innerHTML=intro(mode==='agent'?'Eneo la wakala':mode==='owner'?'Chumba cha mmiliki':'Chumba cha habari',mode==='agent'?'Ingia uone wasifu wako, hali ya maombi yako na huduma ulizowasilisha.':'Usimamizi wa machapisho, ratiba na maoni ya JAMCO.')+`<section class="panel"><h2>${setup?'Sanidi mmiliki':'Ingia kama mchapishaji'}</h2><form class="form" id="staff-login">${setup?'<label>Ufunguo wa usanidi<input name="key" type="password" autocomplete="off" required></label>':''}<label><span data-ui="Barua pepe">Barua pepe</span><input name="email" type="email" autocomplete="username" required></label><label><span data-ui="Nenosiri">Nenosiri</span><input name="password" type="password" autocomplete="current-password" ${setup?'minlength="14"':''} required></label>${setup?'':'<label>Msimbo wa MFA <small>(baada ya usanidi wa kwanza)</small><input name="code" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code"></label>'}<button class="primary">${setup?'Unda mmiliki':'Ingia'}</button><p class="form-status" role="status"></p><button class="text-button" type="button" data-staff-recover>Rejesha nenosiri</button></form><p class="fineprint">Ruhusa hudhibitiwa na seva. Akaunti ya mwanachama haitoi ruhusa ya usimamizi.</p></section>`;$('#staff-login').onsubmit=e=>{e.preventDefault();submit(e.currentTarget,async d=>{const r=await api(setup?'staff-setup':'staff-login',{...d,mode});await admin();return r})};$('[data-staff-recover]').onclick=()=>recovery(true);return}
+  const setup=mode!=='agent'&&new URLSearchParams(location.search).has('setup');
+  main.innerHTML=`<section class="panel studio-login">
+   <h1>${setup?'Sanidi mmiliki':mode==='agent'?'Ingia kama wakala':'Ingia JAMCO Studio'}</h1>
+   <form class="form" id="staff-login">
+    ${setup?'<label>Ufunguo wa usanidi<input name="key" type="password" autocomplete="off" required></label>':''}
+    <div data-password-fields><label>Barua pepe<input name="email" type="email" autocomplete="username" required></label>
+    <label>Nenosiri<input name="password" type="password" autocomplete="${setup?'new-password':'current-password'}" ${setup?'minlength="14"':''} required></label></div>
+    ${setup?'':'<div data-code-field hidden><label>Msimbo wa tarakimu 6<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label><button class="text-button" type="button" data-back-login>Rudi</button></div>'}
+    <button class="primary">${setup?'Unda mmiliki':'Ingia'}</button><p class="form-status" role="status"></p>
+    <button class="text-button" type="button" data-staff-recover>Rejesha nenosiri</button>
+   </form>
+  </section>`;
+  const form=$('#staff-login'),code=form.elements.code;
+  const showCode=value=>{
+   if(!code)return;
+   $('[data-password-fields]',form).hidden=value;
+   $('[data-code-field]',form).hidden=!value;
+   $('[data-staff-recover]',form).hidden=value;
+   code.required=value;
+   code.value='';
+   $('button.primary',form).textContent=value?'Thibitisha':'Ingia';
+   (value?code:form.elements.email).focus();
+  };
+  $('[data-back-login]',form)?.addEventListener('click',()=>{showCode(false);$('.form-status',form).textContent='';});
+  form.onsubmit=e=>{
+   e.preventDefault();
+   submit(form,async data=>{
+    try{
+     const result=await api(setup?'staff-setup':'staff-login',{...data,mode});
+     await admin();
+     return result;
+    }catch(error){
+     if(error.code!=='staff_code_required')throw error;
+     showCode(true);
+     return {message:error.message};
+    }
+   });
+  };
+  $('[data-staff-recover]',form).onclick=()=>recovery(true);
+  return;
+ }
+
  if(!staff.mfa){main.innerHTML=intro('Linda akaunti yako.','MFA inahitajika kwa kila msimamizi.')+`<section class="panel"><h2>Sanidi programu ya uthibitisho</h2><p>Tumia programu ya TOTP. Hifadhi ufunguo kwa usalama kabla ya kuthibitisha.</p><button class="secondary" data-mfa-start>Onyesha ufunguo wa MFA</button><div id="mfa-setup"></div></section>`;$('[data-mfa-start]').onclick=async()=>{try{const d=await api('mfa-start');$('#mfa-setup').innerHTML=`<p class="copy-secret">${esc(d.secret)}</p><p><a href="${esc(d.uri)}" class="text-button">Fungua programu ya uthibitisho</a></p><form class="form" id="mfa-form"><label>Msimbo wa tarakimu 6<input name="code" inputmode="numeric" pattern="[0-9]{6}" required></label><button class="primary">Thibitisha MFA</button><p class="form-status" role="status"></p></form>`;$('#mfa-form').onsubmit=e=>{e.preventDefault();submit(e.currentTarget,async d=>{const r=await api('mfa-confirm',d);await admin();return r})}}catch(e){toast(e.message)}};return}
  if(staff.agent){
   const ui=await import('/staff-space.js?v=1');await ui.agentView(main,viewTools,staff,logout);return;
  }
  let dash;try{dash=await api('admin-dashboard')}catch{dash={grants:[],role:staff.role};for(const p of ['publish','moderate','members','premium']){try{await api(({publish:'admin-posts',moderate:'admin-queue',members:'admin-members',premium:'admin-memberships'})[p]);dash.grants.push(p)}catch{}}}adminGrants=dash.grants;
- const tabs=[['dashboard','Muhtasari','analytics'],['posts','Machapisho','publish'],['compose','Chapisha','publish'],['instagram','Instagram','publish'],['intake','Maombi','publish'],['tips','Taarifa','publish'],['support','Msaada','publish'],['comments','Maoni','moderate'],['queue','Taarifa za jamii','moderate'],['reports','Ripoti','moderate'],['members','Wanachama','members'],['memberships','Premium','premium'],['agents','Mawakala','owner'],['staff','Ruhusa','owner']].filter(x=>x[2]==='owner'?staff.role==='owner':adminGrants.includes(x[2]));if(adminTab==='publish'&&adminGrants.includes('publish'))tabs.splice(2,0,['publish','Mipangilio ya chapisho','publish']);if(!tabs.some(x=>x[0]===adminTab))adminTab=tabs[0]?.[0]||'';main.classList.add('newsroom-workspace');main.innerHTML=`<section class="agent-profile newsroom-profile"><div class="agent-profile-avatar"><img src="/brand/icon-96.png" alt="" width="96" height="96"></div><div><p>JAMCO · CHUMBA CHA HABARI</p><h1>Chumba cha habari</h1><small>${esc(staff.email)}</small></div><a class="secondary" href="/">Ona tovuti</a></section>`+`<div class="tabs admin-tabs">${tabs.map(([k,l])=>`<button class="tab ${adminTab===k?'active':''}" data-admin-tab="${k}">${l}</button>`).join('')}<button class="tab" data-staff-logout>Toka</button></div><div id="admin-panel"></div>`;$$('[data-admin-tab]').forEach(b=>b.onclick=()=>{if($('#media-input')?.disabled||$('#quick-publisher')?.dataset.saving){toast('Subiri upakiaji ukamilike.');return;}if(adminTab===b.dataset.adminTab)return;adminTab=b.dataset.adminTab;admin().catch(error=>toast(error.message));});$('[data-staff-logout]').onclick=async()=>{await api('admin-logout');admin()};await adminPanel(dash)}
+ const tabs=[['dashboard','Muhtasari','analytics'],['posts','Machapisho','publish'],['compose','Chapisha','publish'],['instagram','Instagram','publish'],['intake','Maombi','publish'],['tips','Taarifa','publish'],['support','Msaada','publish'],['comments','Maoni','moderate'],['queue','Taarifa za jamii','moderate'],['reports','Ripoti','moderate'],['members','Wanachama','members'],['memberships','Premium','premium'],['agents','Mawakala','owner'],['staff','Ruhusa','owner']].filter(x=>x[2]==='owner'?staff.role==='owner':adminGrants.includes(x[2]));if(adminTab==='publish'&&adminGrants.includes('publish'))tabs.splice(2,0,['publish','Mipangilio ya chapisho','publish']);if(!tabs.some(x=>x[0]===adminTab))adminTab=tabs[0]?.[0]||'';const secondary=new Set(['instagram','queue','reports','members','memberships','agents','staff']);
+ const tabMarkup=([key,label])=>`<button class="tab ${adminTab===key?'active':''}" data-admin-tab="${key}">${label}</button>`;
+ main.classList.add('newsroom-workspace');main.innerHTML=`<section class="agent-profile newsroom-profile"><div class="agent-profile-avatar"><img src="/brand/icon-96.png" alt="" width="96" height="96"></div><div><p>JAMCO · CHUMBA CHA HABARI</p><h1>Chumba cha habari</h1><small>${esc(staff.email)}</small></div><a class="secondary" href="${studio?studioHome:'/'}">Ona tovuti</a></section>`+`<div class="tabs admin-tabs">${tabs.filter(([key])=>!studio||!secondary.has(key)).map(tabMarkup).join('')}${studio&&tabs.some(([key])=>secondary.has(key))?`<details class="studio-settings" ${secondary.has(adminTab)?'open':''}><summary>Mipangilio</summary><div>${tabs.filter(([key])=>secondary.has(key)).map(tabMarkup).join('')}</div></details>`:''}<button class="tab" data-staff-logout>Toka</button></div><div id="admin-panel"></div>`;$$('[data-admin-tab]').forEach(b=>b.onclick=()=>{if($('#media-input')?.disabled||$('#quick-publisher')?.dataset.saving){toast('Subiri upakiaji ukamilike.');return;}if(adminTab===b.dataset.adminTab)return;adminTab=b.dataset.adminTab;admin().catch(error=>toast(error.message));});$('[data-staff-logout]').onclick=async()=>{await api('admin-logout');admin()};await adminPanel(dash)}
 async function adminPanel(dash){const el=$('#admin-panel');if(adminTab==='dashboard'){const labels={members:'Wanachama',signed_in_members:'Wanachama wenye vipindi hai',new_members:'Waliojiunga siku 7',published:'Maudhui yaliyochapishwa',likes:'Kupendwa',comments:'Maoni',submissions:'Taarifa zinazosubiri',reports:'Ripoti zinazosubiri',premium:'Maombi ya Premium',video_views:'Watazamaji wa video / siku'};el.innerHTML=`<section class="panel">${dash.grants?.includes('publish')?`<div class="newsroom-quick"><button type="button" class="primary" data-new-compose>Chapisho jipya</button><button type="button" class="secondary" data-quick-editor="notice">Tangazo muhimu la leo</button><button type="button" class="secondary" data-quick-editor="funeral">Ratiba ya msiba</button></div>`:''}<div class="stats">${Object.entries(dash.stats||{}).map(([k,v])=>`<div class="stat"><strong>${v}</strong><small>${labels[k]||k}</small></div>`).join('')}</div><p class="fineprint">Vipindi hai si kipimo cha watumiaji walio mtandaoni sasa. Video huhesabiwa baada ya sekunde 2 za kucheza kwa mwanachama aliyethibitishwa, kwa siku.</p></section><section class="panel"><h2>Kumbukumbu za usimamizi</h2>${(dash.audit||[]).map(x=>`<div class="list-item"><strong>${esc(x.action)}</strong><p>${esc(x.subject)}</p><small>${esc(x.actor)} · ${esc(time(x.happened_at))}</small></div>`).join('')}</section>`;
   $('[data-new-compose]',el)?.addEventListener('click',()=>{listingDraft=null;currentEdit=null;adminTab='compose';admin();});
   $$('[data-quick-editor]',el).forEach(button=>button.onclick=()=>{
@@ -551,7 +597,7 @@ function offlinePlaceholder(){
 }
 async function init(){
  clearInterval(feedTimer);clearInterval(commentTimer);stopAutoRead();
- const path=location.pathname;
+ const path=studio&&location.pathname==='/'?'/admin/mmiliki':location.pathname;
  const publicPage=['/','/gundua','/orodha/ombi','/shiriki'].includes(path)||path.startsWith('/habari/');
  const auth=path.startsWith('/admin')?Promise.resolve():loadAccount();
  if(!publicPage)await auth;
@@ -586,6 +632,7 @@ window.addEventListener('offline',()=>{
  $$('[data-offline-source]').forEach(media=>offline.prepareMedia(media));
 });
 window.addEventListener('online',async()=>{
+ if(studio){if(!$('#admin-panel'))await init();return;}
  publicReads.clear();
  if(location.pathname==='/'){
   if(!$('#feed-list .post')){await init();return;}
@@ -620,7 +667,7 @@ window.addEventListener('jamco-language',()=>{
  if(location.pathname==='/gundua')discover().catch(error=>toast(error.message));
  if(location.pathname.startsWith('/habari/'))detail(location.pathname.split('/').pop()).catch(error=>toast(error.message));
 });
-window.addEventListener('popstate',()=>{if(location.pathname==='/'){const next=new URLSearchParams(location.search).get('mada');topic=topics.some(t=>t.key===next)?next:'bukoba';filter='';stopAutoRead();feed().catch(e=>toast(e.message))}});
-if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').then(()=>offline.warm()).catch(()=>{});
+window.addEventListener('popstate',()=>{if(!studio&&location.pathname==='/'){const next=new URLSearchParams(location.search).get('mada');topic=topics.some(t=>t.key===next)?next:'bukoba';filter='';stopAutoRead();feed().catch(e=>toast(e.message))}});
+if(!studio&&'serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').then(()=>offline.warm()).catch(()=>{});
 init();
 })();

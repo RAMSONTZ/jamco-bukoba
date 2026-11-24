@@ -11,7 +11,7 @@ async function post(a,d={},cookie,extra={}){const res=await fetch(host+'/api/'+a
 const api=(a,d,c)=>post('social/'+a,d,c);
 async function enroll(cookie){const r=await api('mfa-start',{},cookie);assert.equal(r.status,200,JSON.stringify(r.data));assert.equal((await api('mfa-confirm',{code:totp(r.data.secret)},cookie)).status,200);return r.data.secret}
 async function verify(cookie,n){const u=(await api('me',{},cookie)).data.user,token='a'.repeat(63)+n;await(await getDb()).query("INSERT INTO jamco_verification(digest,user_id,purpose,expires_at) VALUES($1,$2,'verify',now()+interval '1 hour')",[sha(token),u.id]);assert.equal((await api('token',{token})).status,200);assert.equal((await api('token',{token})).status,400);return u.id}
-before(async()=>{await migrate();server=createServer(handler).listen(0,'127.0.0.1');await once(server,'listening');host='http://127.0.0.1:'+server.address().port});after(()=>server?.close());
+before(async()=>{await migrate();server=createServer((req,res)=>{if(req.headers['x-test-studio'])req.headers.host='jamco-bukoba-admin.vercel.app';return handler(req,res)}).listen(0,'127.0.0.1');await once(server,'listening');host='http://127.0.0.1:'+server.address().port});after(()=>server?.close());
 test('guest routes, feed and protected APIs',async()=>{for(const p of ['/','/gundua','/shiriki','/hifadhi','/akaunti','/admin'])assert.equal((await fetch(host+p)).status,200,p);assert.ok((await api('feed')).data.posts.length);assert.equal((await api('like',{slug})).status,401);assert.equal((await api('admin-dashboard')).status,401)});
 test('owner setup and mandatory MFA',async()=>{const d={email:'owner@example.test',password:'Only used by automated test suite'};assert.equal((await api('staff-setup',{...d,key:'wrong'})).status,403);const r=await api('staff-setup',{...d,key:process.env.JAMCO_SETUP_KEY});assert.equal(r.status,200,JSON.stringify(r.data));owner=r.cookie;assert.match(r.headers.get('set-cookie'),/HttpOnly; SameSite=Strict/);assert.equal((await api('admin-dashboard',{},owner)).status,401);assert.equal((await post('manage/list',{},owner)).status,401);await enroll(owner);assert.equal((await api('admin-dashboard',{},owner)).status,200)});
 test('registration cannot grant role or verification; email tokens single use',async()=>{let r=await api('register',{email:'alice@example.test',password:'Alice secure test password only',name:'Alice',consent:true,role:'owner',verified:true});assert.equal(r.status,200);alice=r.cookie;assert.equal(r.data.verificationSent,false);assert.equal((await api('me',{},alice)).data.user.verified,false);const existing='bukoba-yakagua-miradi';
@@ -263,4 +263,28 @@ test('newsroom publishes short notes or audio-only announcements and receives su
  assert.equal((await api('feed',{slug:audio.slug})).data.posts[0].media[0].alt,'Muziki');
  assert.equal((await post('tip',{email:'support-test@example.test',name:'Jaribio',message:'Nahitaji msaada wa kutumia huduma.',topic:'support',consent:true})).status,200);
  assert.ok((await api('admin-intake',{},owner)).data.items.some(item=>item.email==='support-test@example.test'&&item.data.topic==='support'));
+});
+
+test('dedicated studio uses existing staff authorization and stages the login code',async()=>{
+ const studioHost='jamco-bukoba-admin.vercel.app';
+ const studioHeaders={'x-test-studio':'1'};
+ const root=await fetch(host+'/',{headers:studioHeaders});
+ assert.equal(root.status,200);
+ assert.equal(root.headers.get('x-robots-tag'),'noindex, nofollow');
+ const html=await root.text();
+ assert.match(html,/data-studio="true"/);
+ assert.doesNotMatch(html,/"feed":|rel="manifest"/);
+ const publicRoute=await fetch(host+'/gundua',{headers:studioHeaders,redirect:'manual'});
+ assert.equal(publicRoute.headers.get('location'),'https://jamco-bukoba.vercel.app/gundua');
+ assert.equal((await post('social/admin-dashboard',{},null,studioHeaders)).status,401);
+ assert.equal((await post('social/admin-dashboard',{},owner,{...studioHeaders,Origin:'https://'+studioHost})).status,200);
+ assert.equal((await post('social/admin-dashboard',{},owner,{...studioHeaders,Origin:'https://jamco-bukoba.vercel.app'})).status,403);
+ const password='Only used by automated test suite';
+ const challenge=await post('social/staff-login',{email:'owner@example.test',password,mode:'owner'},null,studioHeaders);
+ assert.equal(challenge.status,401);
+ assert.equal(challenge.data.code,'staff_code_required');
+ assert.equal(challenge.cookie,undefined);
+ const wrong=await post('social/staff-login',{email:'owner@example.test',password:'wrong',mode:'owner'},null,studioHeaders);
+ assert.equal(wrong.status,401);
+ assert.equal(wrong.data.code,undefined);
 });
