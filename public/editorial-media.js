@@ -38,7 +38,7 @@
     if(!size||size>limit)throw Error('Faili imezidi MB '+limit/1_000_000+'. Original haijabadilishwa.');
     const prefix=await file.slice(0,65536).arrayBuffer(),suffix=await file.slice(Math.max(0,size-65536)).arrayBuffer();
     const fingerprint=await crypto.subtle.digest('SHA-256',new Uint8Array([...new Uint8Array(prefix),...new Uint8Array(suffix)]));
-    const key='jamco-upload-v2:'+mime+':'+size+':'+Array.from(new Uint8Array(fingerprint),x=>x.toString(16).padStart(2,'0')).join('');
+    const key='jamco-upload-v2:'+mime+':'+size+':'+encodeURIComponent(file.name||'')+':'+file.lastModified+':'+Array.from(new Uint8Array(fingerprint),x=>x.toString(16).padStart(2,'0')).join('');
     let id;try{id=localStorage.getItem(key)}catch{}if(!id)id=crypto.randomUUID();const meta={id,mime,size};
     try{localStorage.setItem(key,id)}catch{}
     async function request(data){let last;for(let i=0;i<3;i++){try{return await api('upload-part',data)}catch(e){last=e;if(e.status&&e.status<500&&![408,429].includes(e.status))throw e;if(i<2)await new Promise(r=>setTimeout(r,1000*(i+1)))}}throw last}

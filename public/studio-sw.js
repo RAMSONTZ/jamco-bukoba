@@ -1,3 +1,4 @@
+/* JAMCO Studio release: media3. Never use the public app cache. */
 // Studio is network-only: never cache authenticated HTML, API responses or media.
 self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
 self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));

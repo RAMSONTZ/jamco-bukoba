@@ -49,7 +49,7 @@ test('current members only comment and editors can finish moderating previously 
 test('premium approvals, expiry and revocation never grant administration',async()=>{await api('premium',{},alice);await api('premium',{},alice);let d=(await api('admin-memberships',{},owner)).data;assert.equal(d.items.length,1);const id=d.items[0].id;assert.equal((await api('admin-membership-update',{id,status:'approved',expiresAt:'2050-01-01T00:00:00Z'},owner)).status,200);assert.ok((await api('me',{},alice)).data.user.premium_until);assert.equal((await api('admin-posts',{},alice)).status,401);assert.equal((await api('admin-membership-update',{id,status:'revoked'},owner)).status,200);assert.equal((await api('me',{},alice)).data.user.premium_until,null)});
 test('schedules and expiry respected, warnings require verification',async()=>{await api('admin-publish',{...content,slug:'scheduled-test',liveAt:'2050-01-01T00:00:00Z'},owner);assert.equal((await api('feed',{slug:'scheduled-test'})).data.posts.length,0);assert.equal((await fetch(host+'/habari/scheduled-test')).status,404);await api('admin-publish',{...content,slug:'expired-test',expiresAt:'2020-01-01T00:00:00Z'},owner);assert.equal((await api('feed',{slug:'expired-test'})).data.posts.length,0);assert.equal((await api('admin-publish',{...content,contentType:'Tahadhari'},owner)).status,400);assert.ok((await api('feed',{kind:'photo'})).data.posts.every(x=>x.kind==='photo'))});
 test('CSRF checks, MFA replay and session revocation',async()=>{assert.equal((await post('social/like',{slug},alice,{Origin:'https://evil.example'})).status,403);assert.equal((await post('social/me',{},null,{'sec-fetch-site':'cross-site'})).status,403);assert.equal(verifyTotp('JBSWY3DPEHPK3PXP',totp('JBSWY3DPEHPK3PXP'),Math.floor(Date.now()/30000)),null);assert.equal((await api('admin-member-update',{id:bobId,active:false},owner)).status,200);assert.equal((await api('me',{},bob)).data.user,null);assert.equal((await api('login',{email:'bob@example.test',password:'Bob secure test password only'})).status,401);const d=(await api('admin-dashboard',{},owner)).data;assert.ok(d.audit.some(x=>x.action==='member.active.false'));assert.equal(d.stats.members,2);await api('logout',{},alice);assert.equal((await api('me',{},alice)).data.user,null)});
-test('public GET feed and HTML never include member state',async()=>{const signed=await api('login',{email:'alice@example.test',password:'Alice secure test password only'});const cookie=signed.cookie;const r=await fetch(host+'/api/feed?limit=2',{headers:{Cookie:cookie}}),d=await r.json();assert.equal(r.status,200);assert.equal(d.posts.length,2);assert.equal(typeof d.posts[0].views,'number');assert.match(r.headers.get('cache-control'),/s-maxage=10/);assert.ok(d.posts.every(p=>!p.liked&&!('reporter' in p)));assert.ok(!JSON.stringify(d).includes('alice@example.test'));const html=await(await fetch(host+'/',{headers:{Cookie:cookie}})).text();assert.match(html,/id="initial-preview"/);assert.ok(!html.includes('alice@example.test'));assert.equal((await api('admin-instagram-status',{},cookie)).status,401);assert.equal((await api('admin-instagram-status',{},owner)).data.connected,false)});
+test('public GET feed and HTML never include member state',async()=>{const signed=await api('login',{email:'alice@example.test',password:'Alice secure test password only'});const cookie=signed.cookie;const r=await fetch(host+'/api/feed?limit=2',{headers:{Cookie:cookie}}),d=await r.json();assert.equal(r.status,200);assert.equal(d.posts.length,2);assert.equal(typeof d.posts[0].views,'number');assert.match(r.headers.get('cache-control'),/s-maxage=2/);assert.ok(d.posts.every(p=>!p.liked&&!('reporter' in p)));assert.ok(!JSON.stringify(d).includes('alice@example.test'));const html=await(await fetch(host+'/',{headers:{Cookie:cookie}})).text();assert.match(html,/id="initial-preview"/);assert.ok(!html.includes('alice@example.test'));assert.equal((await api('admin-instagram-status',{},cookie)).status,401);assert.equal((await api('admin-instagram-status',{},owner)).data.connected,false)});
 test('discovery excludes expired and future posts and never exposes reporter metadata',async()=>{const d=(await api('discover')).data;assert.ok(d.items.some(x=>x.slug===slug));assert.ok(!d.items.some(x=>['expired-test','scheduled-test'].includes(x.slug)));assert.ok(d.items.every(x=>!('reporter' in x.data)));const html=await(await fetch(host+'/gundua?category=Elimu')).text();assert.doesNotMatch(html,/class="category-cutout"/);assert.match(html,/discovery.css/);assert.match(html,/Rudi Gundua/);});
 test('members can preview only their private media, update avatar and publish reviewed promotions',async()=>{
  const login=await api('login',{email:'alice@example.test',password:'Alice secure test password only'}),cookie=login.cookie;
@@ -123,7 +123,7 @@ test('staff can publish a pinned funeral schedule with organized long text and r
 
 test('large editorial uploads assemble idempotently and play through bounded byte ranges',async()=>{
  const fixture=await readFile(new URL('../qa/video-audio-test.mp4',import.meta.url));
- const clip=Buffer.alloc(20_000_000);
+ const clip=Buffer.alloc(22_500_000);
  fixture.copy(clip);
  clip.writeUInt32BE(clip.length-fixture.length,fixture.length);
  clip.write('free',fixture.length+4);
@@ -135,7 +135,7 @@ test('large editorial uploads assemble idempotently and play through bounded byt
  assert.equal((await api('upload-part',first,owner)).status,200);
  assert.deepEqual((await api('upload-part',{...info,status:true},owner)).data.parts,[0]);
  assert.equal((await api('upload-part',first,owner)).status,200);
- for(let part=1;part<8;part++){
+ for(let part=1;part<9;part++){
   const data=clip.subarray(part*2_500_000,(part+1)*2_500_000).toString('base64');
   assert.equal((await api('upload-part',{...info,part,data},owner)).status,200);
  }
@@ -146,10 +146,10 @@ test('large editorial uploads assemble idempotently and play through bounded byt
  assert.equal((await api('admin-publish',{...content,slug:'test-long-video',media:[saved.data]},owner)).status,200);
  const response=await fetch(host+saved.data.url,{headers:{Range:'bytes=0-'}});
  assert.equal(response.status,206);
- assert.equal(response.headers.get('content-range'),'bytes 0-2499999/20000000');
+ assert.equal(response.headers.get('content-range'),'bytes 0-2499999/22500000');
  assert.equal((await response.arrayBuffer()).byteLength,2_500_000);
  const end=await fetch(host+saved.data.url,{headers:{Range:'bytes=-16'}});
- assert.equal(end.headers.get('content-range'),'bytes 19999984-19999999/20000000');
+ assert.equal(end.headers.get('content-range'),'bytes 22499984-22499999/22500000');
  assert.equal((await end.arrayBuffer()).byteLength,16);
 });
 
