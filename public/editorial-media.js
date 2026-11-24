@@ -9,9 +9,9 @@
   const mimeOf = file => {
     const detected = file.type.split(';')[0].toLowerCase();
     if (detected.startsWith('image/')) return 'image';
-    if (/^(?:video\/(?:mp4|webm)|audio\/(?:mp4|webm|ogg|mpeg|wav))$/.test(detected)) return detected;
+    if (/^(?:video\/(?:mp4|webm|quicktime)|audio\/(?:mp4|webm|ogg|mpeg|wav))$/.test(detected)) return detected;
     const ext = file.name.split('.').pop().toLowerCase();
-    return ({mp4:'video/mp4', m4v:'video/mp4',webm:'video/webm',m4a:'audio/mp4',ogg:'audio/ogg',opus:'audio/ogg',mp3:'audio/mpeg',wav:'audio/wav',mov:'video/mp4'})[ext] || 'image';
+    return ({mp4:'video/mp4', m4v:'video/mp4',webm:'video/webm',m4a:'audio/mp4',ogg:'audio/ogg',opus:'audio/ogg',mp3:'audio/mpeg',wav:'audio/wav',mov:'video/quicktime'})[ext] || 'image';
   };
 
   async function optimizePhoto(file) {
@@ -34,26 +34,24 @@
   }
 
   async function upload(file, api, progress = () => {}) {
-    const mime = mimeOf(file);
-    const body = file; // Store source bytes; server derives display thumbnails separately.
-    const size = body.size;
-    if (!size || size > (mime.startsWith('audio/') ? 10_000_000 : 20_000_000)) {
-      throw Error('Faili imezidi kikomo. Video na picha hadi MB 20, sauti hadi MB 10.');
-    }
-    const meta = {id:crypto.randomUUID(), mime, size};
-    async function request(data) {
-      try { return await api('upload-part', data); }
-      catch (error) {
-        if (error.status && error.status < 500) throw error;
-        return api('upload-part', data);
-      }
-    }
-    for (let offset = 0, part = 0; offset < size; offset += CHUNK, part++) {
-      const data = await toBase64(body.slice(offset, offset + CHUNK));
-      await request({...meta, part, data});
-      progress(Math.round(100 * Math.min(size, offset + CHUNK) / size));
-    }
-    return request({...meta, finish:true});
+    const mime=mimeOf(file),size=file.size,limit=mime.startsWith('video/')?100_000_000:mime.startsWith('audio/')?10_000_000:20_000_000;
+    if(!size||size>limit)throw Error('Faili imezidi MB '+limit/1_000_000+'. Original haijabadilishwa.');
+    const prefix=await file.slice(0,65536).arrayBuffer(),suffix=await file.slice(Math.max(0,size-65536)).arrayBuffer();
+    const fingerprint=await crypto.subtle.digest('SHA-256',new Uint8Array([...new Uint8Array(prefix),...new Uint8Array(suffix)]));
+    const key='jamco-upload-v2:'+mime+':'+size+':'+Array.from(new Uint8Array(fingerprint),x=>x.toString(16).padStart(2,'0')).join('');
+    let id;try{id=localStorage.getItem(key)}catch{}if(!id)id=crypto.randomUUID();const meta={id,mime,size};
+    try{localStorage.setItem(key,id)}catch{}
+    async function request(data){let last;for(let i=0;i<3;i++){try{return await api('upload-part',data)}catch(e){last=e;if(e.status&&e.status<500&&![408,429].includes(e.status))throw e;if(i<2)await new Promise(r=>setTimeout(r,1000*(i+1)))}}throw last}
+    const report=await request({...meta,status:true});if(report.complete){try{localStorage.removeItem(key)}catch{}progress(100,'ready');return report.complete;}
+    const count=Math.ceil(size/CHUNK),done=new Set(report.parts),todo=Array.from({length:count},(_,i)=>i).filter(i=>!done.has(i));
+    let sent=[...done].reduce((n,i)=>n+Math.min(CHUNK,size-i*CHUNK),0),next=0,failure;
+    progress(Math.floor(100*sent/size),'upload');
+    // First part establishes rate limit; the remaining parts may arrive out of order.
+    async function send(i){const offset=i*CHUNK;const data=await toBase64(file.slice(offset,offset+CHUNK));await request({...meta,part:i,data});sent+=Math.min(CHUNK,size-offset);progress(Math.floor(100*sent/size),'upload');}
+    if(todo[0]===0){await send(0);next=1;}
+    async function worker(){while(!failure&&next<todo.length){const i=todo[next++];try{await send(i)}catch(e){failure=e}}}
+    const slow=navigator.connection?.saveData||/2g/.test(navigator.connection?.effectiveType||'');await Promise.all(Array.from({length:slow?1:2},worker));if(failure)throw failure;
+    progress(100,'verify');const result=await request({...meta,finish:true});try{localStorage.removeItem(key)}catch{}progress(100,'ready');return result;
   }
 
   function bindRecorder(root, onFile, onError) {

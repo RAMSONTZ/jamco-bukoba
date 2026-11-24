@@ -130,9 +130,10 @@ test('large editorial uploads assemble idempotently and play through bounded byt
  const info={id:randomUUID(),size:clip.length,mime:'video/mp4'};
  const first={...info,part:0,data:clip.subarray(0,2_500_000).toString('base64')};
  assert.equal((await api('upload-part',first,alice)).status,401);
- assert.equal((await api('upload-part',{...info,size:20_000_001,finish:true},owner)).status,400);
+ assert.equal((await api('upload-part',{...info,size:100_000_001,finish:true},owner)).status,400);
  assert.equal((await api('upload-part',{...info,finish:true},owner)).status,409);
  assert.equal((await api('upload-part',first,owner)).status,200);
+ assert.deepEqual((await api('upload-part',{...info,status:true},owner)).data.parts,[0]);
  assert.equal((await api('upload-part',first,owner)).status,200);
  for(let part=1;part<8;part++){
   const data=clip.subarray(part*2_500_000,(part+1)*2_500_000).toString('base64');
@@ -317,3 +318,5 @@ test('Studio password login and real time-series respect permissions',async()=>{
 test('advertising circle count follows publication state and placement',async()=>{for(const slug of ['test-ad-one','test-ad-two'])assert.equal((await api('admin-publish',{...content,slug,contentType:'Business Promotions',advertiser:'Test company',adCircle:true,adFeed:true},owner)).status,200);const first=await api('ads');assert.ok(first.data.items.some(x=>x.slug==='test-ad-one'));assert.equal(first.data.count,first.data.items.length);assert.equal((await api('admin-publish',{...content,slug:'test-ad-one',contentType:'Business Promotions',state:'archived'},owner)).status,200);const second=await api('ads');assert.equal(second.data.count,first.data.count-1);});
 
 test('editorial image retains uploaded source bytes',async()=>{const bytes=await readFile(new URL('../public/brand/icon-48.png',import.meta.url));const info={id:randomUUID(),size:bytes.length,mime:'image'};assert.equal((await api('upload-part',{...info,part:0,data:bytes.toString('base64')},owner)).status,200);const saved=await api('upload-part',{...info,finish:true},owner);assert.equal(saved.status,200,JSON.stringify(saved.data));const response=await fetch(host+saved.data.url,{headers:{Cookie:owner}});assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes);const d=await api('admin-media-info',{id:info.id},owner);assert.equal(d.data.sha256,sha(bytes));assert.equal(d.data.size,bytes.length);});
+
+test('QuickTime source upload resumes and is byte-identical after publishing',async()=>{const clip=await readFile(new URL('../qa/video-audio-test.mp4',import.meta.url));const info={id:randomUUID(),mime:'video/quicktime',size:clip.length};assert.equal((await api('upload-part',{...info,part:0,data:clip.toString('base64')},owner)).status,200);assert.deepEqual((await api('upload-part',{...info,status:true},owner)).data.parts,[0]);const saved=await api('upload-part',{...info,finish:true},owner);assert.equal(saved.status,200,JSON.stringify(saved.data));assert.equal((await api('upload-part',{...info,status:true},owner)).data.complete.id,info.id);assert.equal((await api('admin-publish',{...content,slug:'test-quicktime-original',media:[saved.data]},owner)).status,200);const response=await fetch(host+saved.data.url);assert.equal(response.headers.get('content-type'),'video/quicktime');assert.deepEqual(Buffer.from(await response.arrayBuffer()),clip);});

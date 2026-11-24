@@ -1,6 +1,6 @@
-const shellCache='jamco-shell-v3';
-const assetCache='jamco-assets-v1';
-const pageCache='jamco-public-pages-v1';
+const shellCache='jamco-shell-v4';
+const assetCache='jamco-assets-v2';
+const pageCache='jamco-public-pages-v2';
 const recentCache='jamco-recent-pictures-v1';
 const videoCache='jamco-watched-v1';
 const offlineShell='/offline-shell';
@@ -11,7 +11,7 @@ const shellFiles=[
  '/brand/icon-192.png','/brand/icon-512.png','/brand/jamco-logo-display.webp',
 ];
 const mediaPath=/^\/media\/[a-f\d-]{36}$/;
-const shellRoutes=/^\/(?:$|gundua\/?$|akaunti\/?$|arifa\/?$|hifadhi\/?$|shiriki\/?$|orodha\/ombi\/?$|(?:habari|picha|tv)\/[a-z0-9-]+\/?$|admin(?:\/(?:mmiliki|wakala))?\/?$|(?:wasiliana|faragha|picha|tv|matukio|biashara|habari)\/?$)/;
+const shellRoutes=/^\/(?:$|gundua\/?$|akaunti\/?$|arifa\/?$|hifadhi\/?$|shiriki\/?$|orodha\/ombi\/?$|(?:habari|picha|tv)\/[a-z0-9-]+\/?$|(?:wasiliana|faragha|picha|tv|matukio|biashara|habari)\/?$)/;
 const assets=/^\/(?:photos\/|discovery\/|brand\/|assets\/|(?:theme|social|feed|discovery|bukoba-guide|editorial-media|jamco-language|offline|service-categories|staff-space|manifest)\.)/;
 const maxMediaSize=20_000_000;
 const maxMediaTotal=60_000_000;
@@ -24,7 +24,7 @@ self.addEventListener('install',event=>event.waitUntil((async()=>{
 })()));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{
  const keys=await caches.keys();
- await Promise.all(keys.filter(key=>(key==='jamco-shell-v1'||key==='jamco-shell-v2')||key.startsWith('jamco-bukoba-')||key.startsWith('jamco-feed-')).map(key=>caches.delete(key)));
+ await Promise.all(keys.filter(key=>(key==='jamco-shell-v1'||key==='jamco-shell-v2'||key==='jamco-shell-v3'||key==='jamco-assets-v1'||key==='jamco-public-pages-v1')||key.startsWith('jamco-bukoba-')||key.startsWith('jamco-feed-')).map(key=>caches.delete(key)));
  await self.clients.claim();
 })()));
 
@@ -59,7 +59,7 @@ function prefetchPage(url){
 async function navigate(event,request,url){
  const cache=safePage(url)?await caches.open(pageCache).catch(()=>null):null;
  const hit=cache?await cache.match(url.href).catch(()=>null):null;
- if(hit&&Date.now()-Number(hit.headers.get('X-Jamco-Saved'))<30000){return hit;}
+
  try{
   const response=await fetch(request,hit&&typeof AbortSignal.timeout==='function'?{signal:AbortSignal.timeout(2500)}:undefined);
   if(response.status<500){
@@ -121,7 +121,7 @@ async function storeWatched(url){
  const request=new Request(url.href,{credentials:'omit',cache:'reload'});
  const response=await fetch(request);
  const mime=response.headers.get('Content-Type')||'';
- if(!publicMedia(response)||! /^(?:video|audio)\//.test(mime)||!response.body)return;
+ if(!publicMedia(response)||! /^audio\//.test(mime)||!response.body){response.body?.cancel().catch(()=>{});return;}
  const reader=response.body.getReader(),parts=[];
  let size=0;
  for(;;){
@@ -147,6 +147,7 @@ async function storeWatched(url){
 self.addEventListener('fetch',event=>{
  const req=event.request,url=new URL(req.url);
  if(req.method!=='GET'||url.origin!==self.location.origin)return;
+ if(/^\/admin(?:\/|$)/.test(url.pathname))return;
  if(req.mode==='navigate'){
   if(shellRoutes.test(url.pathname)||safePage(url))event.respondWith(navigate(event,req,url));
   return;
