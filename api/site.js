@@ -99,6 +99,7 @@ export default async function handler(req,res) {
   if(adminOnly)res.setHeader('X-Robots-Tag','noindex, nofollow');
   if(['/admin','/admin/mmiliki'].includes(path))res.setHeader('Permissions-Policy','camera=(), microphone=(self), geolocation=()');
   try {
+    if(process.env.VERCEL&&host==='jamco-bukoba.vercel.app'&&['GET','HEAD'].includes(req.method)&&studioPages.has(path)){res.setHeader('Location','https://'+adminHost+'/'+parsed.search);return send(res,307,'text/plain','Moved');}
     if(adminOnly&&['GET','HEAD'].includes(req.method)&&!studioPages.has(path)&&!path.startsWith('/api/')&&!path.startsWith('/media/')){
       if(path==='/robots.txt')return send(res,200,'text/plain; charset=utf-8','User-agent: *\nDisallow: /\n');
       if(path==='/offline-shell')return send(res,404,'text/plain','Not found');
