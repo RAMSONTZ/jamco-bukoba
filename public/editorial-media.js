@@ -3,7 +3,7 @@
   const toBase64 = blob => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = reject;
+    reader.onerror = () => reject(reader.error || new Error('File read failed'));reader.onabort = () => reject(new Error('File read cancelled'));
     reader.readAsDataURL(blob);
   });
   const mimeOf = file => {
@@ -33,7 +33,25 @@
     }
   }
 
+  const stableFiles=new WeakSet();
+  function fileAccessError(error){const e=new Error('Simu haikuweza kusoma faili. Chagua faili hiyo tena kutoka kwenye Gallery au Files.');e.code='FILE_ACCESS';e.cause=error;return e;}
+  function isFileAccessError(error){return error?.code==='FILE_ACCESS'||['NotReadableError','NotFoundError','SecurityError'].includes(error?.name);}
+  async function snapshotFile(file){
+    if(stableFiles.has(file))return file;
+    const mime=mimeOf(file),limit=mime.startsWith('video/')?100_000_000:mime.startsWith('audio/')?10_000_000:20_000_000;
+    if(!file.size||file.size>limit)throw Error('Faili imezidi MB '+limit/1_000_000+'. Original haijabadilishwa.');
+    try{
+      // Read all bytes while the file picker still holds its Android content URI.
+      // Copying a File object or slicing it alone does not detach the backing provider.
+      let bytes;
+      if(typeof file.arrayBuffer==='function')bytes=await file.arrayBuffer();
+      else bytes=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.onabort=()=>reject(new Error('Read cancelled'));r.readAsArrayBuffer(file)});
+      if(bytes.byteLength!==file.size)throw new Error('Incomplete file read');
+      const stable=new File([bytes],file.name||'media',{type:file.type,lastModified:file.lastModified});stableFiles.add(stable);return stable;
+    }catch(error){throw fileAccessError(error);}
+  }
   async function upload(file, api, progress = () => {}) {
+    file=await snapshotFile(file);
     const mime=mimeOf(file),size=file.size,limit=mime.startsWith('video/')?100_000_000:mime.startsWith('audio/')?10_000_000:20_000_000;
     if(!size||size>limit)throw Error('Faili imezidi MB '+limit/1_000_000+'. Original haijabadilishwa.');
     const prefix=await file.slice(0,65536).arrayBuffer(),suffix=await file.slice(Math.max(0,size-65536)).arrayBuffer();
@@ -162,5 +180,5 @@
     return true;
   }
 
-  window.JamcoMedia = {upload, bindRecorder, meter, speak};
+  window.JamcoMedia = {upload, snapshotFile, isFileAccessError, bindRecorder, meter, speak};
 })();
