@@ -66,31 +66,31 @@
       xhr.send(blob);
     });
   }
-  async function upload(file, api, progress = () => {}) {
+  async function upload(file, api, progress = () => {}, options = {}) {
     file=await snapshotFile(file);
     const mime=mimeOf(file),size=file.size,limit=mime.startsWith('video/')?100_000_000:mime.startsWith('audio/')?10_000_000:20_000_000;
     if(!size||size>limit)throw Error('Faili imezidi MB '+limit/1_000_000+'. Original haijabadilishwa.');
-    const prefix=await file.slice(0,65536).arrayBuffer(),suffix=await file.slice(Math.max(0,size-65536)).arrayBuffer();
+    const [prefix,suffix]=await Promise.all([file.slice(0,65536).arrayBuffer(),file.slice(Math.max(0,size-65536)).arrayBuffer()]);
     const fingerprint=await crypto.subtle.digest('SHA-256',new Uint8Array([...new Uint8Array(prefix),...new Uint8Array(suffix)]));
     const key='jamco-upload-v2:'+mime+':'+size+':'+encodeURIComponent(file.name||'')+':'+file.lastModified+':'+Array.from(new Uint8Array(fingerprint),x=>x.toString(16).padStart(2,'0')).join('');
     let id;try{id=localStorage.getItem(key)}catch{}if(!id)id=crypto.randomUUID();const meta={id,mime,size};
     try{localStorage.setItem(key,id)}catch{}
     async function request(data){let last;for(let i=0;i<3;i++){try{return await api('upload-part',data)}catch(e){last=e;if(e.status&&e.status<500&&![408,429].includes(e.status))throw e;if(i<2)await new Promise(r=>setTimeout(r,1000*(i+1)))}}throw last}
-    async function prepare(result){if(mime.startsWith('video/')){progress(100,'optimize');try{const x=await api('upload-part',{id, optimize:true,quality:'both'});result.playbackReady=x.ready===true;result.playbackQualities=x.qualities||[];}catch{result.playbackReady=false;}}return result;}
+    async function prepare(result){if(mime.startsWith('video/')){if(options.deferPlayback){result.playbackPending=true;return result;}progress(100,'optimize');try{const x=await api('upload-part',{id, optimize:true,quality:'both'});result.playbackReady=x.ready===true;result.playbackQualities=x.qualities||[];}catch{result.playbackReady=false;}}return result;}
     const report=await request({...meta,status:true});if(report.complete){const result=await prepare(report.complete);try{localStorage.removeItem(key)}catch{}progress(100,'ready');return result;}
     const count=Math.ceil(size/CHUNK),done=new Set(report.parts),todo=Array.from({length:count},(_,i)=>i).filter(i=>!done.has(i));let binary=report.binary===true&&typeof XMLHttpRequest==='function';const inflight=new Map();
     let sent=[...done].reduce((n,i)=>n+Math.min(CHUNK,size-i*CHUNK),0),next=0,failure;
     progress(Math.floor(100*sent/size),'upload');
     // First part establishes rate limit; the remaining parts may arrive out of order.
     function tick(){const bytes=sent+[...inflight.values()].reduce((a,b)=>a+b,0);progress(Math.min(99,Math.floor(100*bytes/size)),'upload');}
-    async function send(i){const offset=i*CHUNK,blob=file.slice(offset,offset+CHUNK);try{
-      if(binary){for(let attempt=0;attempt<3;attempt++){try{await sendBinaryPart(meta,i,blob,n=>{inflight.set(i,n);tick()});break;}catch(e){inflight.delete(i);tick();if([404,405,415].includes(e.status)){binary=false;break;}if(e.status&&e.status<500&&![408,429].includes(e.status))throw e;
+    async function send(i){const offset=i*CHUNK,blob=file.slice(offset,offset+CHUNK);let accepted=false;try{
+      if(binary){for(let attempt=0;attempt<3;attempt++){try{await sendBinaryPart(meta,i,blob,n=>{inflight.set(i,n);tick()});accepted=true;break;}catch(e){inflight.delete(i);tick();if([404,405,415].includes(e.status)){binary=false;break;}if(e.status&&e.status<500&&![408,429].includes(e.status))throw e;
         if(attempt===2)throw e;
         // The last response may have been lost even though the server saved the part.
-        try{const status=await api('upload-part',{...meta,status:true});if(status.complete||status.parts?.includes(i))break;}catch{}
+        try{const status=await api('upload-part',{...meta,status:true});if(status.complete||status.parts?.includes(i)){accepted=true;break;}}catch{}
         await new Promise(r=>setTimeout(r,1000*(attempt+1)));
       }}}
-      if(!binary){const data=await toBase64(blob);await request({...meta,part:i,data});}
+      if(!accepted&&!binary){const data=await toBase64(blob);await request({...meta,part:i,data});}
       sent+=blob.size;
     }finally{inflight.delete(i);tick();}}
     if(todo[0]===0){await send(0);next=1;}
