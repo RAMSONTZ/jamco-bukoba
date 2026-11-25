@@ -373,14 +373,14 @@ async function uploadFile(file){
 }
 function bindUploads(){
  const input=$('#media-input'),uploads=$('#upload-status'),voice=$('[data-synthesize]',input.form),form=input.form;
- const progress=document.createElement('progress');progress.id='upload-progress';progress.max=100;progress.value=0;progress.hidden=true;uploads.before(progress);const retry=document.createElement('button');retry.type='button';retry.className='secondary';retry.textContent='Endelea / jaribu tena';retry.hidden=true;const discard=document.createElement('button');discard.type='button';discard.className='secondary';discard.textContent='Ondoa faili iliyokwama';discard.hidden=true;uploads.after(retry,discard);let pending=[];
+ const progress=document.createElement('progress');progress.id='upload-progress';progress.max=100;progress.value=0;progress.hidden=true;uploads.before(progress);const retry=document.createElement('button');retry.type='button';retry.className='secondary';retry.textContent='Endelea / jaribu tena';retry.hidden=true;const discard=document.createElement('button');discard.type='button';discard.className='secondary';discard.textContent='Ondoa faili iliyokwama';discard.hidden=true;uploads.after(retry,discard);let pending=[],needsReselect=false;
  const block=()=>{form.dataset.mediaPending=String(pending.length);$$('button[type=submit],button.primary',form).forEach(b=>b.disabled=pending.length>0||input.disabled);};
  const add=async (file,alt)=>{
    if(mediaFiles.length>=12)throw Error('Faili zisizidi 12.');
    const item=await uploadFile(file);if(alt)item.alt=alt;mediaFiles.push(item);renderPreviews();uploads.textContent='Faili imepakiwa.';
  };
- const drain=async()=>{if(input.disabled)return;input.disabled=true;progress.hidden=false;retry.hidden=discard.hidden=true;block();try{while(pending.length){await add(pending[0]);pending.shift();block();}uploads.textContent='Media zote ziko tayari. Unaweza kuchapisha.';}catch(error){uploads.textContent=(error.message||'Upload imesimama.')+' — Chagua Endelea; sehemu zilizofika hazitumwi tena.';retry.hidden=discard.hidden=false;}finally{input.disabled=false;block();progress.hidden=!pending.length;}};
- input.onchange=()=>{const chosen=[...input.files];input.value='';if(pending.length){uploads.textContent='Maliza au ondoa faili iliyokwama kwanza.';return;}pending=chosen.slice(0,Math.max(0,12-mediaFiles.length));if(!pending.length){uploads.textContent='Faili zisizidi 12.';return;}drain();};retry.onclick=drain;discard.onclick=()=>{pending=[];retry.hidden=discard.hidden=progress.hidden=true;uploads.textContent='Faili zilizokwama zimeondolewa kwenye chapisho.';block();};
+ const drain=async()=>{if(input.disabled||needsReselect)return;input.disabled=true;progress.hidden=false;retry.hidden=discard.hidden=true;block();try{while(pending.length){uploads.textContent='Inasoma faili asili…';pending[0]=await window.JamcoMedia.snapshotFile(pending[0]);await add(pending[0]);pending.shift();block();}input.value='';uploads.textContent='Media zote ziko tayari. Unaweza kuchapisha.';}catch(error){needsReselect=window.JamcoMedia.isFileAccessError(error);if(needsReselect){uploads.textContent='Simu haikuweza kusoma faili. Bonyeza Chagua faili tena na uchague faili hiyo kutoka Gallery au Files. Caption na media zilizopakiwa zitabaki.';input.value='';retry.textContent='Chagua faili tena';}else{uploads.textContent=(error.message||'Upload imesimama.')+' — Chagua Endelea; sehemu zilizofika hazitumwi tena.';retry.textContent='Endelea / jaribu tena';}retry.hidden=discard.hidden=false;}finally{input.disabled=false;block();progress.hidden=!pending.length;}};
+ input.onchange=()=>{const chosen=[...input.files];if(!chosen.length)return;if(needsReselect){if(chosen.length!==1){uploads.textContent='Chagua faili moja iliyokwama kwanza.';return;}pending[0]=chosen[0];needsReselect=false;retry.textContent='Endelea / jaribu tena';drain();return;}if(pending.length){uploads.textContent='Maliza au ondoa faili iliyokwama kwanza.';return;}pending=chosen.slice(0,Math.max(0,12-mediaFiles.length));if(!pending.length){uploads.textContent='Faili zisizidi 12.';return;}drain();};retry.onclick=()=>{if(needsReselect)input.click();else drain();};discard.onclick=()=>{pending=[];needsReselect=false;input.value='';retry.textContent='Endelea / jaribu tena';retry.hidden=discard.hidden=progress.hidden=true;uploads.textContent='Faili zilizokwama zimeondolewa kwenye chapisho.';block();};
  if(voice)voice.onclick=async()=>{
    if(input.disabled)return;
    if(mediaFiles.length>=12){uploads.textContent='Faili zisizidi 12.';return;}
@@ -395,9 +395,9 @@ function bindUploads(){
  };
  const music=$('[name=music]',input.form);
  if(music)music.onchange=async()=>{
-  if(input.disabled||!music.files[0])return;
+  if(input.disabled||pending.length||!music.files[0])return;
   input.disabled=music.disabled=true;
-  try{await add(music.files[0]);}
+  try{const original=await window.JamcoMedia.snapshotFile(music.files[0]);await add(original);}
   catch(error){uploads.textContent=error.message;}
   finally{input.disabled=music.disabled=false;music.value='';}
  };
