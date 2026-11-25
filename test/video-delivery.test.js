@@ -1,2 +1,4 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {encodeArgs,qualities} from '../lib/video-delivery.js';
 test('playback encodes use H264 AAC faststart and preserve full duration',()=>{for(const q of Object.keys(qualities)){const a=encodeArgs('source','out',q);assert.ok(a.includes('libx264'));assert.ok(a.includes('aac'));assert.ok(a.includes('+faststart'));assert.ok(!a.includes('-t'));assert.ok(a.includes('yuv420p'));}});
+
+test('HD prioritizes detail, native frame rate and stereo without silent low-quality fallback',()=>{const a=encodeArgs('source','out','standard');assert.equal(qualities.standard.height,1080);assert.equal(qualities.standard.crf,'19');assert.equal(a[a.indexOf('-profile:v')+1],'high');assert.equal(a[a.indexOf('-ac')+1],'2');assert.ok(!a.includes('-r'));assert.ok(a.includes('-fpsmax'));assert.equal(qualities.lite.height,360)});
