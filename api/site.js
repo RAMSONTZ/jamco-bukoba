@@ -158,10 +158,11 @@ export default async function handler(req,res) {
       if(req.method!==method) return json(res,405,{message:'Njia hii haikubaliki.'});
       if(method==='POST' && req.headers['sec-fetch-site'] && !['same-origin','none'].includes(req.headers['sec-fetch-site'])) return json(res,403,{message:'Ombi halikuruhusiwa.'});
       if(method==='POST' && req.headers.origin && !['https://'+host,...(!adminOnly?[origin]:[]),...(!process.env.VERCEL?['http://'+host]:[])].includes(req.headers.origin)) return json(res,403,{message:'Ombi halikuruhusiwa.'});
-      const db=await getDb();
+      const requestStarted=performance.now();const db=await getDb();
       const data=method==='POST'?(path==='/api/social/upload-part'&&/^application\/octet-stream(?:;|$)/i.test(req.headers['content-type']||'')?await binaryUploadInput(req):await input(req)):{};
       const manage=path.startsWith('/api/manage/');
       const result=path.startsWith('/api/social/')?await social(db,req,res,path.slice(12),data):manage?await adminAction(db,req,res,path.slice(12),data):await publicAction(db,req,res,path.slice(5),data);
+      if(path==='/api/social/upload-part'){const phase=data.optimize?'encode':data.finish?'assemble':data.status?'resume':'transfer';const ms=Math.round(performance.now()-requestStarted);res.setHeader('Server-Timing',phase+';dur='+ms);if(phase!=='transfer'||ms>1500)console.info('JAMCO upload phase',phase,ms+'ms');}
       if(manage||/\/(?:admin-publish|admin-moderate|admin-instagram-import|admin-instagram-hide|admin-comment-approve|admin-comment-hide|profile|like|view|comment|comment-edit|comment-delete|comment-like)$/.test(path))clearPublicFeed();
       return json(res,200,result);
     }
