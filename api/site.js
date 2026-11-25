@@ -179,7 +179,7 @@ export default async function handler(req,res) {
     if(path.startsWith('/media/')) {
       let file=await media(await getDb(),req,path.slice(7));
       if(!file)return send(res,404,'text/plain','File not found');
-      const quality=query.get('stream');if(quality){const db=await getDb();const copy=await getPlaybackCopy(db,file,path.slice(7),quality)||(quality==='standard'?await getPlaybackCopy(db,file,path.slice(7),'lite'):null);if(copy){file=copy;file.playbackVariant=true;}else{res.setHeader('Cache-Control','no-store');res.setHeader('Location',path);return send(res,307,'text/plain','Original video');}}
+      const quality=query.get('stream');if(quality){const db=await getDb();const copy=await getPlaybackCopy(db,file,path.slice(7),quality);if(copy){file=copy;file.playbackVariant=true;}else{res.setHeader('Cache-Control','no-store');res.setHeader('Location',path);return send(res,307,'text/plain','Original video');}}
       if(query.has('w')&&file.mime.startsWith('image/'))file=await transformImage({...file,data:await file.read(0,file.size)},Number(query.get('w')),query.get('format')||'webp');
       res.setHeader('Cache-Control',file.public?(file.playbackVariant?'public, max-age=300, s-maxage=300':'public, max-age=31536000, s-maxage=31536000, immutable'):'no-store, private');
       res.setHeader('Content-Disposition','inline');
