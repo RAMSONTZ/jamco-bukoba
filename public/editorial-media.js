@@ -50,6 +50,22 @@
       const stable=new File([bytes],file.name||'media',{type:file.type,lastModified:file.lastModified});stableFiles.add(stable);return stable;
     }catch(error){throw fileAccessError(error);}
   }
+  function sendBinaryPart(meta,part,blob,onProgress=()=>{}){
+    return new Promise((resolve,reject)=>{
+      const xhr=new XMLHttpRequest();
+      xhr.open('POST','/api/social/upload-part',true);
+      xhr.timeout=300000;
+      xhr.setRequestHeader('Content-Type','application/octet-stream');
+      xhr.setRequestHeader('X-Jamco-Upload-Id',meta.id);
+      xhr.setRequestHeader('X-Jamco-Upload-Mime',meta.mime);
+      xhr.setRequestHeader('X-Jamco-Upload-Size',String(meta.size));
+      xhr.setRequestHeader('X-Jamco-Upload-Part',String(part));
+      xhr.upload.onprogress=e=>onProgress(Math.min(blob.size,e.loaded));
+      xhr.onload=()=>{let data;try{data=JSON.parse(xhr.responseText)}catch{}if(xhr.status>=200&&xhr.status<300&&data?.part===part)resolve(data);else{const e=new Error(data?.message||'Sehemu ya video haikufika.');e.status=xhr.status||503;reject(e)}};
+      xhr.onerror=xhr.ontimeout=xhr.onabort=()=>reject(new Error('Muunganisho umekatika. Endelea kupakia.'));
+      xhr.send(blob);
+    });
+  }
   async function upload(file, api, progress = () => {}) {
     file=await snapshotFile(file);
     const mime=mimeOf(file),size=file.size,limit=mime.startsWith('video/')?100_000_000:mime.startsWith('audio/')?10_000_000:20_000_000;
@@ -62,14 +78,24 @@
     async function request(data){let last;for(let i=0;i<3;i++){try{return await api('upload-part',data)}catch(e){last=e;if(e.status&&e.status<500&&![408,429].includes(e.status))throw e;if(i<2)await new Promise(r=>setTimeout(r,1000*(i+1)))}}throw last}
     async function prepare(result){if(mime.startsWith('video/')){progress(100,'optimize');try{const x=await api('upload-part',{id, optimize:true,quality:'both'});result.playbackReady=x.ready===true;result.playbackQualities=x.qualities||[];}catch{result.playbackReady=false;}}return result;}
     const report=await request({...meta,status:true});if(report.complete){const result=await prepare(report.complete);try{localStorage.removeItem(key)}catch{}progress(100,'ready');return result;}
-    const count=Math.ceil(size/CHUNK),done=new Set(report.parts),todo=Array.from({length:count},(_,i)=>i).filter(i=>!done.has(i));
+    const count=Math.ceil(size/CHUNK),done=new Set(report.parts),todo=Array.from({length:count},(_,i)=>i).filter(i=>!done.has(i));let binary=report.binary===true&&typeof XMLHttpRequest==='function';const inflight=new Map();
     let sent=[...done].reduce((n,i)=>n+Math.min(CHUNK,size-i*CHUNK),0),next=0,failure;
     progress(Math.floor(100*sent/size),'upload');
     // First part establishes rate limit; the remaining parts may arrive out of order.
-    async function send(i){const offset=i*CHUNK;const data=await toBase64(file.slice(offset,offset+CHUNK));await request({...meta,part:i,data});sent+=Math.min(CHUNK,size-offset);progress(Math.floor(100*sent/size),'upload');}
+    function tick(){const bytes=sent+[...inflight.values()].reduce((a,b)=>a+b,0);progress(Math.min(99,Math.floor(100*bytes/size)),'upload');}
+    async function send(i){const offset=i*CHUNK,blob=file.slice(offset,offset+CHUNK);try{
+      if(binary){for(let attempt=0;attempt<3;attempt++){try{await sendBinaryPart(meta,i,blob,n=>{inflight.set(i,n);tick()});break;}catch(e){inflight.delete(i);tick();if([404,405,415].includes(e.status)){binary=false;break;}if(e.status&&e.status<500&&![408,429].includes(e.status))throw e;
+        if(attempt===2)throw e;
+        // The last response may have been lost even though the server saved the part.
+        try{const status=await api('upload-part',{...meta,status:true});if(status.complete||status.parts?.includes(i))break;}catch{}
+        await new Promise(r=>setTimeout(r,1000*(attempt+1)));
+      }}}
+      if(!binary){const data=await toBase64(blob);await request({...meta,part:i,data});}
+      sent+=blob.size;
+    }finally{inflight.delete(i);tick();}}
     if(todo[0]===0){await send(0);next=1;}
     async function worker(){while(!failure&&next<todo.length){const i=todo[next++];try{await send(i)}catch(e){failure=e}}}
-    const slow=navigator.connection?.saveData||/2g/.test(navigator.connection?.effectiveType||'');await Promise.all(Array.from({length:slow?1:2},worker));if(failure)throw failure;
+    const connection=navigator.connection,slow=connection?.saveData||/2g/.test(connection?.effectiveType||'')||(connection?.downlink!=null&&connection.downlink<1);const workers=slow?1:(connection?.downlink>=8?3:2);await Promise.all(Array.from({length:workers},worker));if(failure)throw failure;
     progress(100,'verify');const result=await prepare(await request({...meta,finish:true}));try{localStorage.removeItem(key)}catch{}progress(100,'ready');return result;
   }
 
