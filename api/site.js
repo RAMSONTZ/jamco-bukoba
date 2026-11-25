@@ -1,4 +1,4 @@
-import {getPlaybackCopy,encoderHealth} from '../lib/video-delivery.js';
+import {getPlaybackCopy,encoderHealth,runVideoJob} from '../lib/video-delivery.js';
 import QRCode from 'qrcode';
 import {readFile} from 'node:fs/promises';
 import {mediaFixture} from '../qa/feed-fixture.js';
@@ -120,6 +120,7 @@ export default async function handler(req,res) {
       res.setHeader('X-Robots-Tag','noindex');
       return send(res,200,'text/html; charset=utf-8',socialShell('/',{offline:true}));
     }
+    const job=path.match(/^\/api\/video-preparation\/([a-f0-9]{64})$/);if(job&&req.method==='GET'){res.setHeader('Cache-Control','no-store');res.setHeader('Referrer-Policy','no-referrer');const result=await runVideoJob(await getDb(),job[1]);return json(res,result?200:404,result||{message:'Job unavailable'});}
     if(path==='/__qa/encoder'&&process.env.VERCEL_ENV==='preview'&&req.method==='GET'){res.setHeader('Cache-Control','no-store');return json(res,200,await encoderHealth())}
     if(path.startsWith('/__qa/')){if(process.env.VERCEL_ENV!=='preview'||path!=='/__qa/media.mp4')return send(res,404,'text/plain','Not found');res.setHeader('Cache-Control','no-store');return sendBinary(req,res,{mime:'video/mp4',data:await readFile(new URL('../qa/video-audio-test.mp4',import.meta.url))})}
     if(path==='/api/today'){
