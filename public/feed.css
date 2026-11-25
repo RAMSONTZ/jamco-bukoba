@@ -3,3 +3,5 @@
 #viewer:has(.viewer-stage video) .viewer-tools{display:none}
 .topic-rail .story-bubble>span:not(.topic-circle){max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .media-slide img{height:auto}
+
+.video-controls .video-quality{width:auto;min-width:36px;padding:0 8px;border-radius:18px;font-size:10px;color:white;font-weight:650;white-space:nowrap}

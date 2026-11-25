@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {encodeArgs,qualities} from '../lib/video-delivery.js';
+test('playback encodes use H264 AAC faststart and preserve full duration',()=>{for(const q of Object.keys(qualities)){const a=encodeArgs('source','out',q);assert.ok(a.includes('libx264'));assert.ok(a.includes('aac'));assert.ok(a.includes('+faststart'));assert.ok(!a.includes('-t'));assert.ok(a.includes('yuv420p'));}});

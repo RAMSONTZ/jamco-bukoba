@@ -1,3 +1,4 @@
+import {getPlaybackCopy,encoderHealth,runVideoJob} from '../lib/video-delivery.js';
 import QRCode from 'qrcode';
 import {readFile} from 'node:fs/promises';
 import {mediaFixture} from '../qa/feed-fixture.js';
@@ -30,12 +31,11 @@ async function sendBinary(req,res,file){
  if(req.headers.range){const match=/^bytes=(\d*)-(\d*)$/.exec(req.headers.range);if(!match||!match[1]&&!match[2]){res.setHeader('Content-Range','bytes */'+size);return send(res,416,'text/plain','Range not satisfiable')}
  if(match[1]){start=Number(match[1]);end=match[2]?Math.min(Number(match[2]),size-1):size-1}else{start=Math.max(0,size-Number(match[2]));end=size-1}
  if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start>=size||end<start){res.setHeader('Content-Range','bytes */'+size);return send(res,416,'text/plain','Range not satisfiable')}
- end=Math.min(end,start+2_499_999);
  status=206;res.setHeader('Content-Range',`bytes ${start}-${end}/${size}`)}
- if(status===200&&req.method==='GET'&&size>3_000_000){
-   res.statusCode=200;res.setHeader('Content-Type',file.mime);res.setHeader('Content-Length',size);res.flushHeaders?.();
-   for(let i=0;i<size&&!res.destroyed;i+=1_000_000){
-     const part=await read(i,Math.min(1_000_000,size-i));
+ if(req.method==='GET'&&end-start+1>3_000_000){
+   res.statusCode=status;res.setHeader('Content-Type',file.mime);res.setHeader('Content-Length',end-start+1);res.flushHeaders?.();
+   for(let i=start;i<=end&&!res.destroyed;i+=2_500_000){
+     const part=await read(i,Math.min(2_500_000,end-i+1));
      if(!res.write(part)) await new Promise(resolve=>{
        const done=()=>{res.removeListener('drain',done);res.removeListener('close',done);resolve()};
        res.once('drain',done);res.once('close',done);
@@ -120,6 +120,8 @@ export default async function handler(req,res) {
       res.setHeader('X-Robots-Tag','noindex');
       return send(res,200,'text/html; charset=utf-8',socialShell('/',{offline:true}));
     }
+    const job=path.match(/^\/api\/video-preparation\/([a-f0-9]{64})$/);if(job&&req.method==='GET'){res.setHeader('Cache-Control','no-store');res.setHeader('Referrer-Policy','no-referrer');const result=await runVideoJob(await getDb(),job[1]);return json(res,result?200:404,result||{message:'Job unavailable'});}
+    if(path==='/__qa/encoder'&&process.env.VERCEL_ENV==='preview'&&req.method==='GET'){res.setHeader('Cache-Control','no-store');return json(res,200,await encoderHealth())}
     if(path.startsWith('/__qa/')){if(process.env.VERCEL_ENV!=='preview'||path!=='/__qa/media.mp4')return send(res,404,'text/plain','Not found');res.setHeader('Cache-Control','no-store');return sendBinary(req,res,{mime:'video/mp4',data:await readFile(new URL('../qa/video-audio-test.mp4',import.meta.url))})}
     if(path==='/api/today'){
       if(!['GET','HEAD'].includes(req.method))return json(res,405,{message:'Method not allowed'});
@@ -177,8 +179,9 @@ export default async function handler(req,res) {
     if(path.startsWith('/media/')) {
       let file=await media(await getDb(),req,path.slice(7));
       if(!file)return send(res,404,'text/plain','File not found');
+      const quality=query.get('stream');if(quality){const db=await getDb();const copy=await getPlaybackCopy(db,file,path.slice(7),quality)||(quality==='standard'?await getPlaybackCopy(db,file,path.slice(7),'lite'):null);if(copy){file=copy;file.playbackVariant=true;}else{res.setHeader('Cache-Control','no-store');res.setHeader('Location',path);return send(res,307,'text/plain','Original video');}}
       if(query.has('w')&&file.mime.startsWith('image/'))file=await transformImage({...file,data:await file.read(0,file.size)},Number(query.get('w')),query.get('format')||'webp');
-      res.setHeader('Cache-Control',file.public?'public, max-age=31536000, s-maxage=31536000, immutable':'no-store, private');
+      res.setHeader('Cache-Control',file.public?(file.playbackVariant?'public, max-age=300, s-maxage=300':'public, max-age=31536000, s-maxage=31536000, immutable'):'no-store, private');
       res.setHeader('Content-Disposition','inline');
       return await sendBinary(req,res,file);
     }
