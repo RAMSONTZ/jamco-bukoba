@@ -133,7 +133,8 @@ function pauseOtherVideos(except){document.querySelectorAll('video,audio').forEa
 function carouselActive(c){return c.dataset.autoPaused!=='1'&&(c.dataset.auto==='1'||autoSlides)}
 function syncCarousel(c){const b=$('[data-carousel-play]',c.parentNode);if(b){b.innerHTML=icon(carouselActive(c)?'pause':'play');b.setAttribute('aria-label',carouselActive(c)?'Simamisha picha zinazobadilika':'Badilisha picha kiotomatiki');b.setAttribute('aria-pressed',String(carouselActive(c)))}}
 function fitAlbum(c){if(!c.closest('.media-album'))return;const index=Math.max(0,Math.min(c.children.length-1,Math.round(c.scrollLeft/Math.max(1,c.clientWidth)))),slide=c.children[index];if(!slide)return;const h=slide.getBoundingClientRect().height;if(h>0&&Math.abs(c.clientHeight-h)>1)c.style.height=Math.ceil(h)+'px';}
-function bindNaturalMedia(root){$$('.carousel',root).forEach(c=>{if(c.dataset.naturalBound)return;c.dataset.naturalBound='1';let frame=0;const fit=()=>{if(frame)return;frame=requestAnimationFrame(()=>{frame=0;if(c.isConnected)fitAlbum(c)});};c.addEventListener('scroll',fit,{passive:true});c.addEventListener('load',fit,true);c.addEventListener('loadedmetadata',fit,true);if(typeof ResizeObserver==='function'){const ro=new ResizeObserver(fit);for(const slide of c.children)ro.observe(slide);}fit();});}
+function bindNaturalMedia(root){$$('.carousel',root).forEach(c=>{if(c.dataset.naturalBound)return;c.dataset.naturalBound='1';let frame=0;const fit=()=>{if(frame)return;frame=requestAnimationFrame(()=>{frame=0;if(c.isConnected)fitAlbum(c)});};c.addEventListener('scroll',fit,{passive:true});c.addEventListener('load',fit,true);c.addEventListener('loadedmetadata',fit,true);fit();});}
+window.addEventListener('resize',()=>$$('.media-album .carousel',main).forEach(fitAlbum),{passive:true});
 function bindMedia(root=main){bindNaturalMedia(root);if(!studio&&!initialData.qa)offline.observePictures(root);if(offline.isOffline())$$('[data-offline-source]',root).forEach(media=>offline.prepareMedia(media));$$('img[data-src]',root).forEach(img=>photoObserver.observe(img));$$('.carousel',root).forEach(c=>{if(!c.dataset.bound){c.dataset.bound='1';c.addEventListener('scroll',()=>{const n=Math.round(c.scrollLeft/c.clientWidth),counter=$('.media-counter',c.parentNode);if(counter)counter.textContent=`${n+1}/${c.children.length}`;$$('[data-slide-to]',c.parentNode).forEach((b,i)=>b.setAttribute('aria-current',String(i===n)))},{passive:true});c.addEventListener('pointerdown',e=>{if(e.target.closest('[data-carousel-play]'))return;c.dataset.autoPaused='1';syncCarousel(c)},{passive:true})}syncCarousel(c)});$$('video',root).forEach(v=>{videoObserver.observe(v);if(!navigator.connection?.saveData&&!studio)prefetchVideo.observe(v);if(!v.dataset.tracking){v.dataset.tracking='1';['play','pause','volumechange','ended'].forEach(event=>v.addEventListener(event,()=>syncVideo(v)));v.addEventListener('play',()=>{pauseOtherVideos(v);const status=$('.video-status',v.parentNode);if(status)status.textContent=''});v.addEventListener('waiting',()=>{const status=$('.video-status',v.parentNode);if(status&&!v.paused){clearTimeout(v.bufferNotice);v.bufferNotice=setTimeout(()=>{if(!v.paused&&v.readyState<3)status.textContent='Video inapakia…'},350);clearTimeout(v.autoDowngrade);if(!v.dataset.quality&&!v.dataset.downgraded&&v.dataset.videoSrc?.includes('stream=standard')&&navigator.connection?.downlink!=null&&navigator.connection.downlink<1.2)v.autoDowngrade=setTimeout(()=>{if(v.paused||v.readyState>=3||!v.isConnected)return;const pos=v.currentTime;v.dataset.downgraded='1';v.dataset.videoSrc=playbackUrl(v.dataset.offlineSource,'lite');v.src=v.dataset.videoSrc;v.addEventListener('loadedmetadata',()=>{if(pos<v.duration)v.currentTime=pos;v.play().catch(()=>syncVideo(v))},{once:true});v.load();},5500);}});v.addEventListener('playing',()=>{clearTimeout(v.bufferNotice);clearTimeout(v.autoDowngrade);scheduleVideo();const status=$('.video-status',v.parentNode);if(status)status.textContent=''});v.addEventListener('error',()=>{const status=$('.video-status',v.parentNode);if(status)status.textContent=offline.isOffline()?tr('Unganisha intaneti ikiwa video hii haijahifadhiwa.','Connect to load this video if it isn’t saved.'):tr('Video haijapakiwa. Bonyeza Cheza ili ujaribu tena.','The video could not load. Select Play to try again.')});v.addEventListener('timeupdate',()=>{if(v.currentTime>=2&&!v.dataset.counted&&user){v.dataset.counted='1';const slug=v.closest('[data-post]')?.dataset.post;if(slug&&!initialData.qa)api('view',{slug}).then(result=>{const counter=$('[data-views]',v.closest('[data-post]'));if(counter)counter.textContent=result.views+' mitazamo';}).catch(()=>{delete v.dataset.counted;})}})}syncVideo(v)});clearInterval(slideTimer);slideTimer=setInterval(()=>{if(document.hidden||viewer.open||sheet.open)return;$$('.carousel').filter(c=>carouselActive(c)&&c.children.length>1&&!$('video',c)).forEach(c=>{const r=c.getBoundingClientRect();if(r.top<innerHeight*.65&&r.bottom>innerHeight*.35){const n=(Math.round(c.scrollLeft/c.clientWidth)+1)%c.children.length;c.scrollTo({left:n*c.clientWidth,behavior:motion()})}})},6000)}
 let autoVideo=true;try{autoVideo=localStorage.getItem('jamco-auto-video')!=='off'}catch{};
 const nearVideos=new Set(),visibleVideos=new Map();let activeVideo=null,videoFrame=0;
@@ -143,7 +144,8 @@ function scheduleVideo(){if(videoFrame)return;videoFrame=requestAnimationFrame((
  for(const v of visibleVideos.keys())if(!v.isConnected)visibleVideos.delete(v);
  if(document.hidden||viewer.open||sheet.open||!autoVideo||navigator.connection?.saveData){if(activeVideo&&!activeVideo.paused)activeVideo.pause();activeVideo=null;return;}
  const candidates=[...visibleVideos].filter(([v,r])=>r>=.35&&!v.dataset.paused&&!v.ended).sort((a,b)=>b[1]-a[1]||Math.abs(a[0].getBoundingClientRect().top-innerHeight/3)-Math.abs(b[0].getBoundingClientRect().top-innerHeight/3));
- const selected=candidates[0]?.[0];if(activeVideo&&activeVideo!==selected)activeVideo.pause();activeVideo=selected||null;
+ const threadVideo=activeThread?.panel?.isConnected&&!activeThread.panel.hidden?candidates.find(([v])=>v.closest('[data-post]')===activeThread.panel.closest('[data-post]'))?.[0]:null;
+ const selected=threadVideo||candidates[0]?.[0];if(activeVideo&&activeVideo!==selected)activeVideo.pause();activeVideo=selected||null;
  if(selected){prepareVideo(selected,true);if(selected.paused){pauseOtherVideos(selected);selected.play().catch(()=>syncVideo(selected));}}
  // Only warm ONE upcoming clip, no competing speculative video downloads on slow links.
  if(![...nearVideos].some(v=>v!==selected&&v.getAttribute('src')&&v.readyState<3&&!visibleVideos.get(v))&&!/2g/.test(navigator.connection?.effectiveType||'')&&(navigator.connection?.downlink??2)>=1.2&&(!selected||selected.readyState>=3)){
@@ -151,7 +153,7 @@ function scheduleVideo(){if(videoFrame)return;videoFrame=requestAnimationFrame((
  if(upcoming){prepareVideo(upcoming,false);if(!selected||selected.readyState>=3)upcoming.preload='auto';}
  }
 });}
-const prefetchVideo=observe(entries=>{for(const e of entries)e.isIntersecting?nearVideos.add(e.target):nearVideos.delete(e.target);scheduleVideo();},{rootMargin:'420px 0px',threshold:0});
+const prefetchVideo=observe(entries=>{for(const e of entries){const v=e.target;if(e.isIntersecting){nearVideos.add(v);}else{nearVideos.delete(v);if(v!==activeVideo&&v.paused&&v.currentTime===0&&!v.dataset.quality&&!v.dataset.paused&&v.getAttribute('src')&&!v.currentSrc.startsWith('blob:')){v.removeAttribute('src');v.preload='none';v.load();}}}scheduleVideo();},{rootMargin:'420px 0px',threshold:0});
 const videoObserver=observe(entries=>{for(const e of entries){visibleVideos.set(e.target,e.isIntersecting?e.intersectionRatio:0);if(!e.isIntersecting)e.target.pause();}scheduleVideo();},{threshold:[0,.15,.35,.5,.7,1]});
 document.addEventListener('visibilitychange',scheduleVideo);window.addEventListener('pageshow',scheduleVideo);
 const motion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth';
@@ -237,7 +239,7 @@ async function comments(slug){
  const holder=$('.inline-thread-list',panel),form=$('form',panel),input=$('textarea',form),context=$('.thread-reply',form),status=$('.form-status',form),reportBox=$('.inline-report',panel);
  const login=()=>{if(user)return true;status.innerHTML=esc(tr('Ingia ili kushiriki.','Sign in to participate.'))+' <a href="/akaunti">'+esc(tr('Ingia','Sign in'))+'</a>';return false;};
  function reset(){state.parent=state.editing=null;context.hidden=true;$('[data-reply-context]',context).textContent='';input.value='';}
- function measure(){if(!alive())return;const rows=[...holder.querySelectorAll('.thread-row')];holder.style.maxHeight=rows.length>5?Math.min(430,Math.max(180,rows[4].offsetTop+rows[4].offsetHeight-holder.offsetTop))+'px':'';$('.thread-scroll-hint',panel).hidden=holder.scrollHeight<=holder.clientHeight+4;}
+ function measure(){if(!alive())return;const rows=[...holder.querySelectorAll('.thread-row')];holder.style.maxHeight=rows.length>5?Math.min(430,Math.round(innerHeight*.42),Math.max(120,rows[4].offsetTop+rows[4].offsetHeight))+'px':'';$('.thread-scroll-hint',panel).hidden=holder.scrollHeight<=holder.clientHeight+4;}
  function rowMarkup(c,depth){
   const name=String(c.display_name||'Mwanajamii'),imported=c.origin==='instagram',own=user?.id===c.user_id,avatar=c.avatar?'<img class="comment-avatar" src="'+esc(thumb(c.avatar))+'" alt="" loading="lazy">':'<span class="comment-initial" aria-hidden="true">'+esc(name[0])+'</span>';
   const id=esc(c.id),likes=Number(c.likes)||0;
@@ -251,7 +253,7 @@ async function comments(slug){
    if(html!==state.lastHtml){const top=holder.scrollTop;holder.innerHTML=html;state.lastHtml=html;holder.scrollTop=top;requestAnimationFrame(measure);}
   }catch(error){if(!alive())return;if(!state.lastHtml){holder.innerHTML='<p class="thread-hint">'+esc(error.message||tr('Maoni hayapatikani kwa sasa.','Comments unavailable.'))+'</p><button type="button" class="secondary" data-thread-retry>'+esc(tr('Jaribu tena','Retry'))+'</button>';}}
  }
- panel.onclick=async e=>{const b=e.target.closest('button');if(!b||!panel.contains(b))return;try{
+ panel.onclick=async e=>{const b=e.target.closest('button');if(!b||!panel.contains(b))return;if(state.busy&&!b.hasAttribute('data-thread-close'))return;try{
   if(b.hasAttribute('data-thread-close')){closeThread();button.focus({preventScroll:true});return;}
   if(b.hasAttribute('data-thread-retry')){await render(true);return;}
   if(b.hasAttribute('data-cancel-reply')){reset();return;}
@@ -782,7 +784,7 @@ window.addEventListener('online',async()=>{
  }else if(offline.logoutPending())flushLogout().catch(()=>{});
 });
 window.addEventListener('jamco-identity-change',()=>{
- user=null;saved.clear();liked.clear();
+ user=null;saved.clear();liked.clear();closeThread();
  if(['/akaunti','/arifa','/hifadhi'].includes(location.pathname))init();
  else {drawNav();if(sheet.open)sheet.close();}
 });
@@ -803,7 +805,7 @@ window.addEventListener('jamco-language',()=>{
  if(location.pathname==='/'&&$('#today')&&topic==='bukoba'){$('#today').innerHTML=scheduleMarkup();updateAutoRead();}
  if(location.pathname==='/orodha/ombi'&&!$$('#listing-request input:not([type=checkbox]),#listing-request textarea').some(field=>field.value))listingRequest();
  if(location.pathname==='/gundua')discover().catch(error=>toast(error.message));
- if(location.pathname.startsWith('/habari/'))detail(location.pathname.split('/').pop()).catch(error=>toast(error.message));
+ if(location.pathname.startsWith('/habari/')){closeThread();detail(location.pathname.split('/').pop()).catch(error=>toast(error.message));}
 });
 window.addEventListener('popstate',()=>{if(studio){adminTab=new URLSearchParams(location.search).get('sehemu')||'dashboard';admin().catch(error=>toast(error.message));return;}if(location.pathname==='/'){const next=new URLSearchParams(location.search).get('mada');topic=topics.some(t=>t.key===next)?next:'bukoba';filter='';stopAutoRead();feed().catch(e=>toast(e.message))}});
 if('serviceWorker'in navigator){if(location.hostname==='jamco-bukoba-admin.vercel.app')navigator.serviceWorker.register('/studio-sw.js',{scope:'/',updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});else if(!studio)navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'}).then(r=>{r.update().catch(()=>{});offline.warm()}).catch(()=>{});}
