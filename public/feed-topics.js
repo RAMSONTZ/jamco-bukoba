@@ -1,7 +1,7 @@
 export const feedTopics=[
  {key:'bukoba',label:'Bukoba',icon:'compass',aliases:[]},
- {key:'serikali',label:'Serikali',icon:'building',aliases:['Taarifa za Serikali','Serikali']},
- {key:'maendeleo',label:'Maendeleo',icon:'growth',aliases:['Maendeleo','Miundombinu','Ujenzi']},
+ {key:'serikali',label:'Serikali',icon:'building',aliases:['Taarifa za Serikali','Serikali','Viongozi','Ofisi za Serikali','Viongozi wa Bukoba','Ofisi','Uongozi']},
+ {key:'maendeleo',label:'Maendeleo',icon:'growth',aliases:['Maendeleo','Miundombinu','Ujenzi','Bukoba Inabadilika','Maendeleo ya Bukoba']},
  {key:'jamii',label:'Jamii',icon:'people',aliases:['Jamii','Taarifa ya Jamii','Taarifa Muhimu','Msiba / Kumbukumbu','Harusi / Uchumba','Mahafali']},
  {key:'matukio',label:'Matukio',icon:'calendar',aliases:['Matukio','Tukio']},
  {key:'matangazo',label:'Matangazo',icon:'megaphone',aliases:['Tangazo','Business Promotions','Matangazo','Tangazo la biashara']},
