@@ -46,6 +46,17 @@ async function sendBinary(req,res,file){
  res.setHeader('Content-Length',end-start+1);return send(res,status,file.mime,req.method==='HEAD'?'':await read(start,end-start+1));
 }
 
+// Raw upload parts avoid Base64 inflation. The same staff, origin, rate-limit
+// and idempotency checks still run in social()/uploadPart().
+async function binaryUploadInput(req) {
+ const cap=2_500_000,h=req.headers;
+ if(Number(h['content-length'])>cap)throw new ApiError(413,'Sehemu ya faili ni kubwa mno.');
+ let bytes=req.body;
+ if(bytes===undefined){const chunks=[];let n=0;for await(const c of req){const b=Buffer.isBuffer(c)?c:Buffer.from(c);n+=b.length;if(n>cap)throw new ApiError(413,'Sehemu ya faili ni kubwa mno.');chunks.push(b);}bytes=Buffer.concat(chunks);}
+ if(!(Buffer.isBuffer(bytes)||bytes instanceof Uint8Array))throw new ApiError(415,'Tumia njia mbadala ya kupakia.');
+ if(bytes.byteLength>cap)throw new ApiError(413,'Sehemu ya faili ni kubwa mno.');
+ return {id:String(h['x-jamco-upload-id']||''),mime:String(h['x-jamco-upload-mime']||''),size:Number(h['x-jamco-upload-size']),part:h['x-jamco-upload-part']===undefined?NaN:Number(h['x-jamco-upload-part']),data:Buffer.from(bytes)};
+}
 async function input(req) {
   if(!/^application\/json(?:;|$)/i.test(req.headers['content-type']||'')) throw new ApiError(415,'Tuma taarifa za JSON.');
   if(Number(req.headers['content-length'])>4_300_000) throw new ApiError(413,'Faili ni kubwa mno.');
@@ -148,7 +159,7 @@ export default async function handler(req,res) {
       if(method==='POST' && req.headers['sec-fetch-site'] && !['same-origin','none'].includes(req.headers['sec-fetch-site'])) return json(res,403,{message:'Ombi halikuruhusiwa.'});
       if(method==='POST' && req.headers.origin && !['https://'+host,...(!adminOnly?[origin]:[]),...(!process.env.VERCEL?['http://'+host]:[])].includes(req.headers.origin)) return json(res,403,{message:'Ombi halikuruhusiwa.'});
       const db=await getDb();
-      const data=method==='POST'?await input(req):{};
+      const data=method==='POST'?(path==='/api/social/upload-part'&&/^application\/octet-stream(?:;|$)/i.test(req.headers['content-type']||'')?await binaryUploadInput(req):await input(req)):{};
       const manage=path.startsWith('/api/manage/');
       const result=path.startsWith('/api/social/')?await social(db,req,res,path.slice(12),data):manage?await adminAction(db,req,res,path.slice(12),data):await publicAction(db,req,res,path.slice(5),data);
       if(manage||/\/(?:admin-publish|admin-moderate|admin-instagram-import|admin-instagram-hide|admin-comment-approve|admin-comment-hide|profile|like|view|comment|comment-edit|comment-delete|comment-like)$/.test(path))clearPublicFeed();
