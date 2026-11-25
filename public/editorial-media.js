@@ -33,13 +33,25 @@
     }
   }
 
+  // Android/WhatsApp providers may report application/octet-stream, image/*,
+  // or an empty MIME type. Prefer a recognized container signature.
+  function detectedMime(file,bytes){
+    const b=new Uint8Array(bytes,0,Math.min(bytes.byteLength,64)),ascii=(start,end)=>String.fromCharCode(...b.subarray(start,end)),declared=mimeOf(file);
+    if(b.length>=12&&['ftyp','moov','mdat','wide','free'].includes(ascii(4,8))){
+      const brand=ascii(8,12);
+      if(/^(avif|avis|heic|heix|hevc|hevx|mif1|msf1)$/.test(brand))return 'image';
+      if(declared.startsWith('audio/')||brand==='M4A ')return 'audio/mp4';
+      return brand==='qt  '||declared==='video/quicktime'?'video/quicktime':'video/mp4';
+    }
+    if(b.length>=4&&b[0]===0x1a&&b[1]===0x45&&b[2]===0xdf&&b[3]===0xa3)return declared==='audio/webm'?'audio/webm':'video/webm';
+    return declared;
+  }
   const stableFiles=new WeakSet();
   function fileAccessError(error){const e=new Error('Simu haikuweza kusoma faili. Chagua faili hiyo tena kutoka kwenye Gallery au Files.');e.code='FILE_ACCESS';e.cause=error;return e;}
   function isFileAccessError(error){return error?.code==='FILE_ACCESS'||['NotReadableError','NotFoundError','SecurityError'].includes(error?.name);}
   async function snapshotFile(file){
     if(stableFiles.has(file))return file;
-    const mime=mimeOf(file),limit=mime.startsWith('video/')?100_000_000:mime.startsWith('audio/')?10_000_000:20_000_000;
-    if(!file.size||file.size>limit)throw Error('Faili imezidi MB '+limit/1_000_000+'. Original haijabadilishwa.');
+    if(!file.size||file.size>100_000_000)throw Error('Faili haina data au imezidi MB 100. Original haijabadilishwa.');
     try{
       // Read all bytes while the file picker still holds its Android content URI.
       // Copying a File object or slicing it alone does not detach the backing provider.
@@ -47,8 +59,10 @@
       if(typeof file.arrayBuffer==='function')bytes=await file.arrayBuffer();
       else bytes=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.onabort=()=>reject(new Error('Read cancelled'));r.readAsArrayBuffer(file)});
       if(bytes.byteLength!==file.size)throw new Error('Incomplete file read');
-      const stable=new File([bytes],file.name||'media',{type:file.type,lastModified:file.lastModified});stableFiles.add(stable);return stable;
-    }catch(error){throw fileAccessError(error);}
+      const mime=detectedMime(file,bytes),limit=mime.startsWith('video/')?100_000_000:mime.startsWith('audio/')?10_000_000:20_000_000;
+      if(file.size>limit){const e=Error('Faili imezidi MB '+limit/1_000_000+'.');e.code='FILE_SIZE';throw e;}
+      const stable=new File([bytes],file.name||'media',{type:mime==='image'?(file.type.startsWith('image/')?file.type:'image/jpeg'):mime,lastModified:file.lastModified});stableFiles.add(stable);return stable;
+    }catch(error){if(error.code==='FILE_SIZE')throw error;throw fileAccessError(error);}
   }
   function sendBinaryPart(meta,part,blob,onProgress=()=>{}){
     return new Promise((resolve,reject)=>{
@@ -206,5 +220,5 @@
     return true;
   }
 
-  window.JamcoMedia = {upload, snapshotFile, isFileAccessError, bindRecorder, meter, speak};
+  window.JamcoMedia = {upload, detectedMime, snapshotFile, isFileAccessError, bindRecorder, meter, speak};
 })();
