@@ -1,11 +1,11 @@
 {
   "framework": null,
-  "installCommand": "npm ci && npm install --no-save --package-lock=false ffmpeg-static@5.3.0",
+  "installCommand": "npm ci && npm install --no-save --package-lock=false ffmpeg-static@5.3.0 && mkdir -p lib/vendor && cp node_modules/ffmpeg-static/ffmpeg lib/vendor/ffmpeg && chmod +x lib/vendor/ffmpeg",
   "outputDirectory": "public",
   "functions": {
     "api/site.js": {
       "maxDuration": 60,
-      "includeFiles": "{node_modules/@spelling-creator/spellophone/{espeak-ng-data,wasm}/**,node_modules/ffmpeg-static/ffmpeg}"
+      "includeFiles": "{node_modules/@spelling-creator/spellophone/{espeak-ng-data,wasm}/**,lib/vendor/ffmpeg}"
     }
   },
   "routes": [
