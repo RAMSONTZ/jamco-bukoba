@@ -42,7 +42,8 @@
     let id;try{id=localStorage.getItem(key)}catch{}if(!id)id=crypto.randomUUID();const meta={id,mime,size};
     try{localStorage.setItem(key,id)}catch{}
     async function request(data){let last;for(let i=0;i<3;i++){try{return await api('upload-part',data)}catch(e){last=e;if(e.status&&e.status<500&&![408,429].includes(e.status))throw e;if(i<2)await new Promise(r=>setTimeout(r,1000*(i+1)))}}throw last}
-    const report=await request({...meta,status:true});if(report.complete){try{localStorage.removeItem(key)}catch{}progress(100,'ready');return report.complete;}
+    async function prepare(result){if(mime.startsWith('video/')){progress(100,'optimize');try{const x=await api('upload-part',{id, optimize:true,quality:'lite'});result.playbackReady=x.ready===true;}catch{result.playbackReady=false;}}return result;}
+    const report=await request({...meta,status:true});if(report.complete){const result=await prepare(report.complete);try{localStorage.removeItem(key)}catch{}progress(100,'ready');return result;}
     const count=Math.ceil(size/CHUNK),done=new Set(report.parts),todo=Array.from({length:count},(_,i)=>i).filter(i=>!done.has(i));
     let sent=[...done].reduce((n,i)=>n+Math.min(CHUNK,size-i*CHUNK),0),next=0,failure;
     progress(Math.floor(100*sent/size),'upload');
@@ -51,7 +52,7 @@
     if(todo[0]===0){await send(0);next=1;}
     async function worker(){while(!failure&&next<todo.length){const i=todo[next++];try{await send(i)}catch(e){failure=e}}}
     const slow=navigator.connection?.saveData||/2g/.test(navigator.connection?.effectiveType||'');await Promise.all(Array.from({length:slow?1:2},worker));if(failure)throw failure;
-    progress(100,'verify');const result=await request({...meta,finish:true});try{localStorage.removeItem(key)}catch{}progress(100,'ready');return result;
+    progress(100,'verify');const result=await prepare(await request({...meta,finish:true}));try{localStorage.removeItem(key)}catch{}progress(100,'ready');return result;
   }
 
   function bindRecorder(root, onFile, onError) {

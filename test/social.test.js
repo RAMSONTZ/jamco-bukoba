@@ -121,7 +121,7 @@ test('staff can publish a pinned funeral schedule with organized long text and r
  assert.ok(!('body' in preview.posts.find(post=>post.slug===entry.slug)));
 });
 
-test('large editorial uploads assemble idempotently and play through bounded byte ranges',async()=>{
+test('large editorial uploads assemble idempotently and honor requested byte ranges',async()=>{
  const fixture=await readFile(new URL('../qa/video-audio-test.mp4',import.meta.url));
  const clip=Buffer.alloc(22_500_000);
  fixture.copy(clip);
@@ -146,8 +146,8 @@ test('large editorial uploads assemble idempotently and play through bounded byt
  assert.equal((await api('admin-publish',{...content,slug:'test-long-video',media:[saved.data]},owner)).status,200);
  const response=await fetch(host+saved.data.url,{headers:{Range:'bytes=0-'}});
  assert.equal(response.status,206);
- assert.equal(response.headers.get('content-range'),'bytes 0-2499999/22500000');
- assert.equal((await response.arrayBuffer()).byteLength,2_500_000);
+ assert.equal(response.headers.get('content-range'),'bytes 0-22499999/22500000');
+ assert.deepEqual(Buffer.from(await response.arrayBuffer()),clip);
  const end=await fetch(host+saved.data.url,{headers:{Range:'bytes=-16'}});
  assert.equal(end.headers.get('content-range'),'bytes 22499984-22499999/22500000');
  assert.equal((await end.arrayBuffer()).byteLength,16);

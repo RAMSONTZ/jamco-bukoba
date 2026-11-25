@@ -1,6 +1,6 @@
-const shellCache='jamco-shell-v4';
-const assetCache='jamco-assets-v2';
-const pageCache='jamco-public-pages-v2';
+const shellCache='jamco-shell-v5';
+const assetCache='jamco-assets-v3';
+const pageCache='jamco-public-pages-v3';
 const recentCache='jamco-recent-pictures-v1';
 const videoCache='jamco-watched-v1';
 const offlineShell='/offline-shell';
