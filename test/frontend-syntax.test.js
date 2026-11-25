@@ -1,4 +1,4 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {spawnSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
-for(const f of ['social.js','studio-dashboard.js','studio-video-editor.js','editorial-media.js','media-library.js','offline.js','studio-sw.js'])test('parse '+f,()=>{const r=spawnSync(process.execPath,['--check',fileURLToPath(new URL('../public/'+f,import.meta.url))],{encoding:'utf8'});assert.equal(r.status,0,r.stderr)});
+for(const f of ['social.js','studio-dashboard.js','studio-shell.js','studio-video-editor.js','editorial-media.js','media-library.js','offline.js','studio-sw.js'])test('parse '+f,()=>{const r=spawnSync(process.execPath,['--check',fileURLToPath(new URL('../public/'+f,import.meta.url))],{encoding:'utf8'});assert.equal(r.status,0,r.stderr)});
 
 test('public post interaction has one like and one share handler',async()=>{const {readFile}=await import('node:fs/promises');const text=await readFile(new URL('../public/social.js',import.meta.url),'utf8');assert.equal((text.match(/if\(b\.dataset\.like\)/g)||[]).length,1);assert.equal((text.match(/if\(b\.dataset\.share\)/g)||[]).length,1);});
